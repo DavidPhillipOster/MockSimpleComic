@@ -40,12 +40,12 @@ static NSArray<NSString *> *sOCRLanguages1;
 	dispatch_once(&onceToken, ^{
 		if (@available(macOS 10.15, *))
 		{
-			VNRecognizeTextRequest *textRequest =
-				[[VNRecognizeTextRequest alloc] initWithCompletionHandler:^(VNRequest *request, NSError *error) {}];
-			textRequest.recognitionLevel = VNRequestTextRecognitionLevelAccurate;
-			sOCRLanguages0 = textRequest.recognitionLanguages;
-			textRequest.recognitionLevel = VNRequestTextRecognitionLevelFast;
-			sOCRLanguages1 = textRequest.recognitionLanguages;
+			NSUInteger revision = VNRecognizeTextRequestRevision1;
+			if (@available(macOS 11.0, *)){
+				revision = VNRecognizeTextRequestRevision2;
+			}
+			sOCRLanguages0 = [VNRecognizeTextRequest supportedRecognitionLanguagesForTextRecognitionLevel:VNRequestTextRecognitionLevelAccurate revision:revision error:NULL];
+			sOCRLanguages1 = [VNRecognizeTextRequest supportedRecognitionLanguagesForTextRecognitionLevel:VNRequestTextRecognitionLevelFast revision:revision error:NULL];
 			sOCRLanguage = sOCRLanguages0.firstObject;
 		}
 	});
@@ -188,6 +188,11 @@ static NSArray<NSString *> *sOCRLanguages1;
   }];
   VNImageRequestHandler *handler  = nil;
   if (textRequest) {
+		NSString *ocrLanguage = [[self class] ocrLanguage];
+		if (ocrLanguage)
+		{
+			textRequest.recognitionLanguages = @[ocrLanguage];
+		}
     handler = [[VNImageRequestHandler alloc] initWithCGImage:image options:@{}];
 		[handler performRequests:@[textRequest] error:errorp];
   }
