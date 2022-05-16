@@ -10,7 +10,10 @@ with a yellow tint.
 It runs the Vision.framework OCR engine. Once that completes, it tint just the places where
 it recognized text.
 
-If run under Xcode, it will log the recognized text to Xcode's console.
+If run under Xcode, it will log the recognized text to Xcode's console. Example of the start of
+what it found with this sample page.
+
+![sample](images/sample.png)
 
 ```
 YES, WELL... SINCE YOU ARE
