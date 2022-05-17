@@ -27,8 +27,14 @@ static NSString *sOCRLanguage;
 static NSArray<NSString *> *sOCRLanguages0;
 static NSArray<NSString *> *sOCRLanguages1;
 
+typedef enum OCRDragEnum {
+	OCRDragEnumNot,
+	OCRDragEnumHand,
+	OCRDragEnumIBeam
+} OCRDragEnum;
+
 @interface OCRedTextView()
-@property BOOL isInDrag;
+@property OCRDragEnum dragKind;
 /// <VNRecognizedTextObservation *> - 10.15 and newer
 @property(nonatomic) NSArray *textPieces;
 @end
@@ -43,7 +49,8 @@ static NSArray<NSString *> *sOCRLanguages1;
 		if (@available(macOS 10.15, *))
 		{
 			NSUInteger revision = VNRecognizeTextRequestRevision1;
-			if (@available(macOS 11.0, *)){
+			if (@available(macOS 11.0, *))
+			{
 				revision = VNRecognizeTextRequestRevision2;
 			}
 			sOCRLanguages0 = [VNRecognizeTextRequest supportedRecognitionLanguagesForTextRecognitionLevel:VNRequestTextRecognitionLevelAccurate revision:revision error:NULL];
@@ -258,8 +265,11 @@ static NSArray<NSString *> *sOCRLanguages1;
 
 - (void)mouseDown:(NSEvent *)theEvent
 {
-	if (NO)
+	NSPoint where =  [self convertPoint:[theEvent locationInWindow] fromView:nil];
+	NSObject *textPiece = [self textPieceForPoint:where];
+	if (textPiece != nil)
 	{
+		[[NSCursor IBeamCursor] set];
 	}
 	else if([self dragIsPossible])
 	{
@@ -277,12 +287,24 @@ static NSArray<NSString *> *sOCRLanguages1;
 	NSPoint viewOrigin = [[self enclosingScrollView] documentVisibleRect].origin;
 	NSPoint cursor = [theEvent locationInWindow];
 	NSPoint currentPoint;
-	if (NO)
+	NSPoint where =  [self convertPoint:cursor fromView:nil];
+	NSObject *textPiece = [self textPieceForPoint:where];
+	if (textPiece != nil)
 	{
+		self.dragKind = OCRDragEnumIBeam;
+		while ([theEvent type] != NSEventTypeLeftMouseUp)
+		{
+			if ([theEvent type] == NSEventTypeLeftMouseDragged)
+			{
+				currentPoint = [self convertPoint:[theEvent locationInWindow] fromView:nil];
+			}
+			theEvent = [[self window] nextEventMatchingMask: NSEventMaskLeftMouseUp | NSEventMaskLeftMouseDragged];
+		}
+		self.dragKind = OCRDragEnumNot;
 	}
 	else if([self dragIsPossible])
 	{
-		self.isInDrag = YES;
+		self.dragKind = OCRDragEnumHand;
 		while ([theEvent type] != NSEventTypeLeftMouseUp)
 		{
 			if ([theEvent type] == NSEventTypeLeftMouseDragged)
@@ -293,7 +315,7 @@ static NSArray<NSString *> *sOCRLanguages1;
 			}
 			theEvent = [[self window] nextEventMatchingMask: NSEventMaskLeftMouseUp | NSEventMaskLeftMouseDragged];
 		}
-		self.isInDrag = NO;
+		self.dragKind = OCRDragEnumNot;
 		[[self window] invalidateCursorRectsForView: self];
 	}
 }
@@ -327,6 +349,29 @@ static NSArray<NSString *> *sOCRLanguages1;
 	return (visible.height < round(total.height));
 }
 
+- (nullable NSObject *)textPieceForPoint:(CGPoint)where
+{
+	if (@available(macOS 10.15, *))
+	{
+		if (self.textPieces)
+		{
+			CGRect container = [[self enclosingScrollView] documentVisibleRect];
+			NSAffineTransform *transform = [NSAffineTransform transform];
+			[transform scaleXBy:self.bounds.size.width yBy:self.bounds.size.height];
+			for (VNRecognizedTextObservation *piece in self.textPieces)
+			{
+				CGRect r = piece.boundingBox;
+				r.origin = [transform transformPoint:r.origin];
+				r.size = [transform transformSize:r.size];
+				r = CGRectIntersection(r, container);
+				if (!CGRectIsEmpty(r) && CGRectContainsPoint(r, where)) {
+					return piece;
+				}
+			}
+		}
+	}
+	return nil;
+}
 
 - (BOOL)dragIsPossible
 {
@@ -335,8 +380,10 @@ static NSArray<NSString *> *sOCRLanguages1;
 
 - (void)resetCursorRects
 {
-
-	if (@available(macOS 10.15, *))
+	if (self.dragKind == OCRDragEnumIBeam) {
+		[self addCursorRect: [[self enclosingScrollView] documentVisibleRect] cursor:[NSCursor IBeamCursor]];
+	}
+	else if (@available(macOS 10.15, *))
 	{
 		if (self.textPieces)
 		{
@@ -355,11 +402,9 @@ static NSArray<NSString *> *sOCRLanguages1;
 			}
 		}
 	}
-
-
 	if([self dragIsPossible])
 	{
-		NSCursor *cursor = self.isInDrag ? [NSCursor closedHandCursor] : [NSCursor openHandCursor];
+		NSCursor *cursor = self.dragKind == OCRDragEnumHand ? [NSCursor closedHandCursor] : [NSCursor openHandCursor];
 		[self addCursorRect: [[self enclosingScrollView] documentVisibleRect] cursor:cursor];
 	}
 //	else if(canCrop)
