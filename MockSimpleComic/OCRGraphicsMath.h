@@ -17,4 +17,23 @@
 
 #import <Cocoa/Cocoa.h>
 
+/// Given the corners of a quadrilateral, and inset ratios, return the NSBezierPath of the quad.
+///
+/// @param tl - top left corner of a quadrilateral
+/// @param tr - top right corner of a quadrilateral
+/// @param br - bottom right corner of a quadrilateral (going around it clockwise)
+/// @param bl - bottom left corner
+/// @param start - ratio, 0…1 to inset. 0 means the left edge.
+/// @param end - ratio, 0…1 to inset. 0 means the right edge.
+/// @return the NSBezierPath
 NSBezierPath *OCRBezierPathFromCornersRatio(CGPoint tl, CGPoint tr, CGPoint br, CGPoint bl, CGFloat start, CGFloat end);
+
+/// Given the corners of a quadrilateral, and a point, return a ratio: 0.0 means the left edge, 1.0 the right edge.
+///
+/// @param tl - top left corner of a quadrilateral
+/// @param tr - top right corner of a quadrilateral
+/// @param br - bottom right corner of a quadrilateral (going around it clockwise)
+/// @param bl - bottom left corner
+/// @param where - a point in the same coordinate system as the quad
+/// @return the ratio
+CGFloat OCRRatioCornersToPoint(CGPoint tl, CGPoint tr, CGPoint br, CGPoint bl, CGPoint where);

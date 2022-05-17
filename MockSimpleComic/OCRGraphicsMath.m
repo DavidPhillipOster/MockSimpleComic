@@ -55,10 +55,10 @@ typedef struct LineSegmentStruct {
 
 // For each line segment, replace it by a quadrilateral that is "wider" than the line segment
 // by 'amount', then merge the quadrilaterals. Analogous to setPenSize.
-- (instancetype)widen:(CGFloat)amount;
+- (instancetype)polylineWiden:(CGFloat)amount;
 
 // Like widen, but 'miter' the ends of the polylines by endcapAngle.
-- (instancetype)widen:(CGFloat)amount endcapAngle:(CGFloat)endcapAngle;
+- (instancetype)polylineWiden:(CGFloat)amount endcapAngle:(CGFloat)endcapAngle;
 
 - (NSBezierPath *)path;
 
@@ -333,7 +333,7 @@ static CGFloat AngleInRadians1(CGPoint first, CGPoint center) {
 // For each vertex, increasing, create the 'south' vertex, then decreasing, create the 'north' vertex.
 // for each pair of vertices, go out the appropriate distance to get two vertices on the 'border' line.
 // polyline. appropriate distance: solve the trig.
-- (instancetype)widen1:(CGFloat)amount endcapAngle:(CGFloat)endcapAngle {
+- (instancetype)polylineWiden1:(CGFloat)amount endcapAngle:(CGFloat)endcapAngle {
   OCRPolyLine *result = [[OCRPolyLine alloc] init];
   amount /= 2;
   for (int i = 0; i <  _count; ++i) {
@@ -346,11 +346,11 @@ static CGFloat AngleInRadians1(CGPoint first, CGPoint center) {
   return result;
 }
 
-- (instancetype)widen:(CGFloat)amount endcapAngle:(CGFloat)endcapAngle {
-  return [self widen1:amount endcapAngle:endcapAngle];
+- (instancetype)polylineWiden:(CGFloat)amount endcapAngle:(CGFloat)endcapAngle {
+  return [self polylineWiden1:amount endcapAngle:endcapAngle];
 }
-- (instancetype)widen:(CGFloat)amount {
-  return [self widen:amount endcapAngle:0];
+- (instancetype)polylineWiden:(CGFloat)amount {
+  return [self polylineWiden:amount endcapAngle:0];
 }
 
 - (NSBezierPath *)path {
@@ -378,8 +378,8 @@ static CGFloat PointDistance(CGPoint a, CGPoint b) {
 }
 
 NSBezierPath *OCRBezierPathFromCornersRatio(CGPoint tl, CGPoint tr, CGPoint br, CGPoint bl, CGFloat startRatio, CGFloat endRatio){
-	CGPoint leftCenter = PointAverage(tl, bl);
-	CGPoint rightCenter = PointAverage(tr, br);
+	CGPoint leftCenter = PointAverage(tl, bl);	// on center of left edge
+	CGPoint rightCenter = PointAverage(tr, br);	// on center of right edge
 	CGFloat length = PointDistance(leftCenter, rightCenter);
 	CGFloat halfWidth = (PointDistance(tl, leftCenter) + PointDistance(bl, leftCenter) + PointDistance(tr, rightCenter) + PointDistance(br, rightCenter))/4;
 	OCRPolyLine *polygon = [[OCRPolyLine alloc] init];
@@ -388,6 +388,34 @@ NSBezierPath *OCRBezierPathFromCornersRatio(CGPoint tl, CGPoint tr, CGPoint br, 
 	[polygon shortenStartBy:shortenBy];
 	CGFloat endBy = (1.0 - endRatio) * length;
 	[polygon shortenEndBy:endBy];
-	polygon = [polygon widen:2*halfWidth];
+	CGFloat angleOfSegment = AngleInRadians1(rightCenter, leftCenter);
+	polygon = [polygon polylineWiden:2*halfWidth endcapAngle:angleOfSegment];
 	return [polygon path];
+}
+
+CGFloat OCRRatioCornersToPoint(CGPoint tl, CGPoint tr, CGPoint br, CGPoint bl, CGPoint where) {
+	CGFloat result = 0;
+	CGPoint leftCenter = PointAverage(tl, bl);	// on center of left edge
+	CGPoint rightCenter = PointAverage(tr, br);	// on center of right edge
+	if (ArePointsEqual(where, leftCenter)) {
+		return 0.0;
+	}
+	if (ArePointsEqual(where, rightCenter)) {
+		return 1.0;
+	}
+	OCRLineSegment *segment = [[OCRLineSegment alloc] initWithStart:leftCenter end:rightCenter];
+	CGFloat angleOfSegment = AngleInRadians1(rightCenter, leftCenter);
+	CGFloat angleOfLine = angleOfSegment + M_PI_2;
+	CGFloat bigDistance = 2*MAX(PointDistance(leftCenter, where), PointDistance(rightCenter, where));
+	CGPoint p1 = NSMakePoint(where.x + bigDistance*cos(angleOfLine), where.y + bigDistance*sin(angleOfLine));
+	CGPoint p2 = NSMakePoint(where.x + -bigDistance*cos(angleOfLine), where.y + -bigDistance*sin(angleOfLine));
+	// Make a long line of the correct angle that goes through 'where'
+  OCRLineSegment *line = [[OCRLineSegment alloc] initWithStart:p1 end:p2];
+  CGPoint join;
+  if ([segment intersectsLine:line at:&join]) {
+		CGFloat segmentLength = PointDistance(leftCenter, rightCenter);
+		CGFloat joinLength = PointDistance(leftCenter, join);
+		return joinLength/segmentLength;
+  }
+	return result;
 }
