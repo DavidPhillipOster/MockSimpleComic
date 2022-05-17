@@ -21,7 +21,6 @@ static NSBezierPath *BezierPathFromTextObservation(VNRecognizedTextObservation *
 	return path;
 }
 
-
 static NSString *sOCRLanguage;
 
 static NSArray<NSString *> *sOCRLanguages0;
@@ -250,6 +249,8 @@ typedef enum OCRDragEnum {
 /// Called by VNRecognizeTextRequest to process the result.
 /// Filter the textPieces that includes actual text, and store in self.textPieces.
 ///
+///  Since this is called on a worker queue, it delivers results on the main queue.
+///
 /// @param request - The VNRecognizeTextRequest
 /// @param error - if non-nil, the VNRecognizeTextRequest is reporting an error.
 - (void)handleTextRequest:(nullable VNRequest *)request error:(nullable NSError *)error API_AVAILABLE(macos(10.15))
@@ -288,6 +289,8 @@ typedef enum OCRDragEnum {
 ///  make a RequestHandler perform a RecognizeTextRequest, with results processed in the method of this class:
 ///  -[handleTextRequest:error:]
 ///
+///  Since this is called on a worker queue, it delivers results on the main queue.
+///
 ///  @param image - the CGImage
 - (void)actualOCRCGImage:(CGImageRef)image API_AVAILABLE(macos(10.15))
 {
@@ -299,21 +302,21 @@ typedef enum OCRDragEnum {
 			}];
   if (textRequest)
   {
-		VNImageRequestHandler *handler = nil;
 		NSString *ocrLanguage = [[self class] ocrLanguage];
 		if (ocrLanguage)
 		{
 			textRequest.recognitionLanguages = @[ocrLanguage];
 		}
 		NSError *error = nil;
-    handler = [[VNImageRequestHandler alloc] initWithCGImage:image options:@{}];
+    VNImageRequestHandler *handler = [[VNImageRequestHandler alloc] initWithCGImage:image options:@{}];
 		if (![handler performRequests:@[textRequest] error:&error])
 		{
-			self.ocrError = error;
+			dispatch_async(dispatch_get_main_queue(), ^{ self.ocrError = error; });
 		}
   } else {
 		NSString *desc = @"Could not create text request";
-		self.ocrError = [NSError errorWithDomain:@"OCRText" code:2 userInfo:@{NSLocalizedDescriptionKey : desc}];
+		NSError *err = [NSError errorWithDomain:@"OCRText" code:2 userInfo:@{NSLocalizedDescriptionKey : desc}];
+		dispatch_async(dispatch_get_main_queue(), ^{ self.ocrError = err; });
   }
 }
 
@@ -600,7 +603,5 @@ typedef enum OCRDragEnum {
   }
   return NO;
 }
-
-
 
 @end
