@@ -182,10 +182,6 @@ typedef enum OCRDragEnum {
 		[self.selectionPieces removeAllObjects];
 		[self setNeedsDisplay:YES];
 		[self.window invalidateCursorRectsForView:self];
-		if (texts.count)
-		{
-			NSLog(@"\n%@", [self allText]);
-		}
 	}
 }
 
@@ -294,11 +290,18 @@ typedef enum OCRDragEnum {
 	NSObject *textPiece = [self textPieceForPoint:where];
 	if (textPiece != nil)
 	{
-		[[NSCursor IBeamCursor] set];
-		if (!(theEvent.modifierFlags & NSEventModifierFlagCommand))
-		{
-			[self.selectionPieces removeAllObjects];
-			[self setNeedsDisplay:YES];
+		if (self.selectionPieces[ [NSValue valueWithPointer:(__bridge const void *)(textPiece)] ] != nil && (theEvent.modifierFlags & NSEventModifierFlagControl) != 0) {
+			NSMenu *theMenu = [[NSMenu alloc] initWithTitle:@"Contextual Menu"];
+			[theMenu insertItemWithTitle:@"Copy" action:@selector(copy:) keyEquivalent:@"" atIndex:0];
+			[theMenu insertItemWithTitle:@"Start Speaking" action:@selector(startSpeaking:) keyEquivalent:@"" atIndex:0];
+			[NSMenu popUpContextMenu:theMenu withEvent:theEvent forView:self];
+		} else {
+			[[NSCursor IBeamCursor] set];
+			if (!(theEvent.modifierFlags & NSEventModifierFlagCommand))
+			{
+				[self.selectionPieces removeAllObjects];
+				[self setNeedsDisplay:YES];
+			}
 		}
 	}
 	else if([self dragIsPossible])
@@ -417,7 +420,8 @@ typedef enum OCRDragEnum {
 	return nil;
 }
 
-- (CGRect)boundBoxOfPiece:(VNRecognizedTextObservation *)piece  API_AVAILABLE(macos(10.15)){
+- (CGRect)boundBoxOfPiece:(VNRecognizedTextObservation *)piece  API_AVAILABLE(macos(10.15))
+{
 	NSAffineTransform *transform = [NSAffineTransform transform];
 	[transform scaleXBy:self.bounds.size.width yBy:self.bounds.size.height];
 	CGRect r = piece.boundingBox;
@@ -426,7 +430,8 @@ typedef enum OCRDragEnum {
 	return r;
 }
 
-- (void)trackTextPiece:(NSObject *)textPieceObject atPoint:(NSPoint)where {
+- (void)trackTextPiece:(NSObject *)textPieceObject atPoint:(NSPoint)where
+{
 	if (@available(macOS 10.15, *))
 	{
 		VNRecognizedTextObservation *textPiece = (VNRecognizedTextObservation *)textPieceObject;
@@ -485,7 +490,8 @@ typedef enum OCRDragEnum {
 	}
 }
 
-- (void)copyToPasteboard:(NSPasteboard *)pboard {
+- (void)copyToPasteboard:(NSPasteboard *)pboard
+{
   NSString *s = [self selection];
   [pboard clearContents];
   [pboard setString:s forType:NSPasteboardTypeString];
@@ -557,17 +563,16 @@ typedef enum OCRDragEnum {
 
 - (id)validRequestorForSendType:(NSString *)sendType returnType:(NSString *)returnType
 {
-  if (([sendType isEqual:NSPasteboardTypeString] || [sendType isEqual:NSStringPboardType]) &&
-      [self.selectionPieces count] != 0)
+  if (([sendType isEqual:NSPasteboardTypeString] || [sendType isEqual:NSStringPboardType]) && [self.selectionPieces count] != 0)
 	{
     return self;
   }
   return [[self nextResponder] validRequestorForSendType:sendType returnType:returnType];
 }
 
-- (BOOL)writeSelectionToPasteboard:(NSPasteboard *)pboard types:(NSArray *)types {
-  if (([types containsObject:NSPasteboardTypeString] || [types containsObject:NSStringPboardType]) &&
-      [self.selectionPieces count] != 0)
+- (BOOL)writeSelectionToPasteboard:(NSPasteboard *)pboard types:(NSArray *)types
+{
+  if (([types containsObject:NSPasteboardTypeString] || [types containsObject:NSStringPboardType]) && [self.selectionPieces count] != 0)
 	{
     [self copyToPasteboard:pboard];
     return YES;
