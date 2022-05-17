@@ -6,19 +6,19 @@
 
 #import "OCRedTextView.h"
 
+#import "OCRGraphicsMath.h"
 #import <Vision/Vision.h>
 
+///  start and end are in range 0…1 and control how much of the potential path to return. For the whole path, use start=0, end=1
+///
+/// @param piece - VNRecognizedTextObservation with points of rectangle.
+/// @param start - low ratio of the piece's path
+/// @param end - high ratio of the piece's path
 /// @return the quadrilateral of the text observation as a NSBezierPath/
 API_AVAILABLE(macos(10.15))
-static NSBezierPath *BezierPathFromTextObservation(VNRecognizedTextObservation *piece)
+static NSBezierPath *BezierPathFromTextObservation(VNRecognizedTextObservation *piece, CGFloat start, CGFloat end)
 {
-	NSBezierPath *path = [NSBezierPath bezierPath];
-	[path moveToPoint:piece.topLeft];
-	[path lineToPoint:piece.topRight];
-	[path lineToPoint:piece.bottomRight];
-	[path lineToPoint:piece.bottomLeft];
-	[path closePath];
-	return path;
+	return OCRBezierPathFromCornersRatio(piece.topLeft, piece.topRight, piece.bottomRight, piece.bottomLeft, start, end);
 }
 
 static NSString *sOCRLanguage;
@@ -139,15 +139,28 @@ typedef enum OCRDragEnum {
 			[transform scaleXBy:self.bounds.size.width yBy:self.bounds.size.height];
 			for (VNRecognizedTextObservation *piece in self.textPieces)
 			{
-				NSBezierPath *path = BezierPathFromTextObservation(piece);
-				[path transformUsingAffineTransform:transform];
-				OCRSelectionPiece *selectionPiece = self.selectionPieces[ [NSValue valueWithPointer:(__bridge const void *)(piece)] ];
-				if (selectionPiece != nil) {
-					NSBezierPath *path = BezierPathFromTextObservation(piece);
-					[path transformUsingAffineTransform:transform];
-					[[NSColor.yellowColor colorWithAlphaComponent:0.4] set];
-					// more here.
-					[path fill];
+				NSRect bound = [self boundBoxOfPiece:piece];
+				if (CGRectIntersectsRect(bound, dirtyRect))
+				{
+					OCRSelectionPiece *selectionPiece = self.selectionPieces[ [NSValue valueWithPointer:(__bridge const void *)(piece)] ];
+					if (selectionPiece != nil) {
+						CGFloat start = selectionPiece.start;
+						CGFloat end = selectionPiece.end;
+						if (end < start) {
+							start = selectionPiece.end;
+							end = selectionPiece.start;
+						}
+						NSBezierPath *path = BezierPathFromTextObservation(piece, start, end);
+						[path transformUsingAffineTransform:transform];
+						[[NSColor.yellowColor colorWithAlphaComponent:0.4] set];
+						[path fill];
+
+						path = BezierPathFromTextObservation(piece, 0, 1);
+						[path transformUsingAffineTransform:transform];
+						[[NSColor.yellowColor colorWithAlphaComponent:0.7] set];
+						[path stroke];
+
+					}
 				}
 			}
 		}
@@ -424,10 +437,15 @@ typedef enum OCRDragEnum {
 	}
 }
 
+/// Update the selection - called repeatedly while the mouse is down.
+///
+///  @param textPieceObject - the VNRecognizedTextObservation the point is in.
+///  @param where - the current mouse point
 - (void)trackTextPiece:(NSObject *)textPieceObject atPoint:(NSPoint)where
 {
 	if (@available(macOS 10.15, *))
 	{
+// TODO: mouse track partial textPieces
 		VNRecognizedTextObservation *textPiece = (VNRecognizedTextObservation *)textPieceObject;
 		NSValue *textValue = [NSValue valueWithPointer:(__bridge const void *)(textPiece)];
 		OCRSelectionPiece *selectionPair = self.selectionPieces[textValue];
@@ -435,7 +453,7 @@ typedef enum OCRDragEnum {
 		{
 			selectionPair = [[OCRSelectionPiece alloc] init];
 			selectionPair.start = 0.0;
-			selectionPair.end = 0.5;
+			selectionPair.end = 1.0;
 			self.selectionPieces[textValue] = selectionPair;
 		}
 		CGRect r = [self boundBoxOfPiece:textPiece];
