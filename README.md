@@ -10,8 +10,11 @@ with a yellow tint.
 It runs the Vision.framework OCR engine. Once that completes, it tints just the places where
 it recognized text.
 
-If run under Xcode, it will log the recognized text to Xcode's console. Example of the start of
-what it found with this sample page.
+If run under Xcode, it will log the recognized text to Xcode's console.
+
+On the menubar, Select All, Copy, and Start Speaking work, as do items on the Services submenu.
+
+Example of the start of what it found with this sample page.
 
 ![sample](images/sample.png)
 
