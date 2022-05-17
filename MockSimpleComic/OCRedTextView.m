@@ -23,8 +23,7 @@ static NSBezierPath *BezierPathFromTextObservation(VNRecognizedTextObservation *
 
 static NSString *sOCRLanguage;
 
-static NSArray<NSString *> *sOCRLanguages0;
-static NSArray<NSString *> *sOCRLanguages1;
+static NSArray<NSString *> *sOCRLanguages;
 static NSSpeechSynthesizer *sSpeechSynthesizer;
 
 typedef enum OCRDragEnum {
@@ -65,26 +64,22 @@ typedef enum OCRDragEnum {
 			{
 				revision = VNRecognizeTextRequestRevision2;
 			}
-			sOCRLanguages0 = [VNRecognizeTextRequest supportedRecognitionLanguagesForTextRecognitionLevel:VNRequestTextRecognitionLevelAccurate revision:revision error:NULL];
-			sOCRLanguages1 = [VNRecognizeTextRequest supportedRecognitionLanguagesForTextRecognitionLevel:VNRequestTextRecognitionLevelFast revision:revision error:NULL];
-			sOCRLanguage = sOCRLanguages0.firstObject;
+			if (@available(macOS 12.0, *))
+			{
+				VNRecognizeTextRequest *textRequest = [[VNRecognizeTextRequest alloc] initWithCompletionHandler:^(VNRequest *request, NSError *error){}];
+				sOCRLanguages = [textRequest supportedRecognitionLanguagesAndReturnError:nil];
+			} else {
+				sOCRLanguages = [VNRecognizeTextRequest supportedRecognitionLanguagesForTextRecognitionLevel:VNRequestTextRecognitionLevelAccurate revision:revision error:NULL];
+			}
+			sOCRLanguage = sOCRLanguages.firstObject;
 		}
 	});
 }
 
 + (NSArray<NSString *> *)ocrLanguages
 {
-	if (nil == sOCRLanguages0){ return @[]; }
-	NSMutableSet *langs = [NSMutableSet set];
-	if (nil != sOCRLanguages0)
-	{
-		[langs addObjectsFromArray:sOCRLanguages0];
-	}
-	if (nil != sOCRLanguages1)
-	{
-		[langs addObjectsFromArray:sOCRLanguages1];
-	}
-	return [[langs allObjects] sortedArrayUsingSelector:@selector(caseInsensitiveCompare:)];
+	if (nil == sOCRLanguages){ return @[]; }
+	return sOCRLanguages;
 }
 
 + (NSString *)ocrLanguage
@@ -101,7 +96,7 @@ typedef enum OCRDragEnum {
 			sOCRLanguage = ocrLanguage;
 		}
 	} else {
-		sOCRLanguage = sOCRLanguages0.firstObject;
+		sOCRLanguage = sOCRLanguages.firstObject;
 	}
 }
 
