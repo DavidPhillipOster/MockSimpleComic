@@ -10,7 +10,8 @@
 
 /// @return the quadrilateral of the text observation as a NSBezierPath/
 API_AVAILABLE(macos(10.15))
-static NSBezierPath *BezierPathFromTextObservation(VNRecognizedTextObservation *piece) {
+static NSBezierPath *BezierPathFromTextObservation(VNRecognizedTextObservation *piece)
+{
 	NSBezierPath *path = [NSBezierPath bezierPath];
 	[path moveToPoint:piece.topLeft];
 	[path lineToPoint:piece.topRight];
@@ -27,14 +28,15 @@ static NSArray<NSString *> *sOCRLanguages0;
 static NSArray<NSString *> *sOCRLanguages1;
 
 @interface OCRedTextView()
-
+@property BOOL isInDrag;
 /// <VNRecognizedTextObservation *> - 10.15 and newer
 @property(nonatomic) NSArray *textPieces;
 @end
 
 @implementation OCRedTextView
 
-+ (void)initialize {
++ (void)initialize
+{
 	[super initialize];
 	static dispatch_once_t onceToken;
 	dispatch_once(&onceToken, ^{
@@ -51,25 +53,32 @@ static NSArray<NSString *> *sOCRLanguages1;
 	});
 }
 
-+ (NSArray<NSString *> *)ocrLanguages {
-	if (nil == sOCRLanguages0) { return @[]; }
++ (NSArray<NSString *> *)ocrLanguages
+{
+	if (nil == sOCRLanguages0){ return @[]; }
 	NSMutableSet *langs = [NSMutableSet set];
-	if (nil != sOCRLanguages0) {
+	if (nil != sOCRLanguages0)
+	{
 		[langs addObjectsFromArray:sOCRLanguages0];
 	}
-	if (nil != sOCRLanguages1) {
+	if (nil != sOCRLanguages1)
+	{
 		[langs addObjectsFromArray:sOCRLanguages1];
 	}
 	return [[langs allObjects] sortedArrayUsingSelector:@selector(caseInsensitiveCompare:)];
 }
 
-+ (NSString *)ocrLanguage {
++ (NSString *)ocrLanguage
+{
 	return sOCRLanguage;
 }
 
-+ (void)setOCRLanguage:(NSString *)ocrLanguage {
-	if (nil != ocrLanguage) {
-		if ([[self ocrLanguages] containsObject:ocrLanguage]) {
++ (void)setOCRLanguage:(NSString *)ocrLanguage
+{
+	if (nil != ocrLanguage)
+	{
+		if ([[self ocrLanguages] containsObject:ocrLanguage])
+		{
 			sOCRLanguage = ocrLanguage;
 		}
 	} else {
@@ -77,26 +86,31 @@ static NSArray<NSString *> *sOCRLanguages1;
 	}
 }
 
-- (instancetype)initWithCoder:(NSCoder *)coder {
+- (instancetype)initWithCoder:(NSCoder *)coder
+{
 	self = [super initWithCoder:coder];
 	[self initOCRedTextView];
 	return self;
 }
 
-- (instancetype)initWithFrame:(NSRect)frameRect {
+- (instancetype)initWithFrame:(NSRect)frameRect
+{
 	self = [super initWithFrame:frameRect];
 	[self initOCRedTextView];
 	return self;
 }
 
-- (void)initOCRedTextView {
+- (void)initOCRedTextView
+{
 	self.layer.backgroundColor = NSColor.redColor.CGColor;
 }
 
-- (void)drawRect:(NSRect)dirtyRect {
+- (void)drawRect:(NSRect)dirtyRect
+{
 	[super drawRect:dirtyRect];
-	[[NSColor.yellowColor colorWithAlphaComponent:0.4] set];
-	if (self.textPieces == nil) {
+	[[NSColor.yellowColor colorWithAlphaComponent:0.9] set];
+	if (self.textPieces == nil)
+	{
 		CGRect smallBounds = CGRectInset(self.bounds, 20, 20);
 		NSRectFill(smallBounds);
 	} else {
@@ -108,13 +122,14 @@ static NSArray<NSString *> *sOCRLanguages1;
 			{
 				NSBezierPath *path = BezierPathFromTextObservation(piece);
 				[path transformUsingAffineTransform:transform];
-				[path fill];
+				[path stroke];
 			}
 		}
 	}
 }
 
-- (NSString *)allText {
+- (NSString *)allText
+{
 	if (@available(macOS 10.15, *))
 	{
 		NSMutableArray *a = [NSMutableArray array];
@@ -128,12 +143,15 @@ static NSArray<NSString *> *sOCRLanguages1;
 	return nil;
 }
 
-- (void)setTextPieces:(NSArray *)texts {
-	if (_textPieces != texts) {
+- (void)setTextPieces:(NSArray *)texts
+{
+	if (_textPieces != texts)
+	{
 		_textPieces = texts;
 		if (texts.count)
 		{
 			[self setNeedsDisplay:YES];
+			[self.window invalidateCursorRectsForView:self];
 			NSLog(@"\n%@", [self allText]);
 		}
 	}
@@ -141,28 +159,31 @@ static NSArray<NSString *> *sOCRLanguages1;
 
 - (void)handleTextRequest:(VNRequest *)request
 										error:(NSError *)error
-						 continuation:(void (^)(NSArray *_Nullable idx, NSError *_Nullable error))continuation  API_AVAILABLE(macos(10.15)){
+						 continuation:(void (^)(NSArray *_Nullable idx, NSError *_Nullable error))continuation  API_AVAILABLE(macos(10.15))
+{
 	if (error)
 	{
 		continuation(nil, error);
-	} else if ([request isKindOfClass:[VNRecognizeTextRequest class]]) {
+	}
+	else if ([request isKindOfClass:[VNRecognizeTextRequest class]])
+	{
 		VNRecognizeTextRequest *textRequests = (VNRecognizeTextRequest *)request;
 		NSMutableArray<VNRecognizedTextObservation *> *pieces = [NSMutableArray array];
 		NSArray *results = textRequests.results;
-		for (id rawResult in results) {
+		for (id rawResult in results)
+		{
 			if ([rawResult isKindOfClass:[VNRecognizedTextObservation class]])
 			{
 				VNRecognizedTextObservation *textO = (VNRecognizedTextObservation *)rawResult;
 				NSArray<VNRecognizedText *> *text1 = [textO topCandidates:1];
-				if (text1.count) {
+				if (text1.count)
+				{
 					[pieces addObject:textO];
 				}
 			}
 		}
 		continuation(pieces, nil);
-	}
-	else
-	{
+	} else {
 		NSString *desc = @"Unrecognized text request";
 		NSError *err = [NSError errorWithDomain:@"OCRText" code:1 userInfo:@{NSLocalizedDescriptionKey : desc}];
 		continuation(nil, err);
@@ -170,11 +191,13 @@ static NSArray<NSString *> *sOCRLanguages1;
 }
 
 
-- (void)actualOCRCGImage:(CGImageRef)image API_AVAILABLE(macos(10.15)) {
+- (void)actualOCRCGImage:(CGImageRef)image API_AVAILABLE(macos(10.15))
+{
   __weak typeof(self) weakSelf = self;
   __block NSError *__autoreleasing  _Nullable *errorp = nil;
   VNRecognizeTextRequest *textRequest =
-      [[VNRecognizeTextRequest alloc] initWithCompletionHandler:^(VNRequest *request, NSError *error) {
+      [[VNRecognizeTextRequest alloc] initWithCompletionHandler:^(VNRequest *request, NSError *error)
+	{
     [weakSelf handleTextRequest:request error:error continuation:
       ^(NSArray *_Nullable idx, NSError *_Nullable error){
 			dispatch_async(dispatch_get_main_queue(), ^{
@@ -187,7 +210,8 @@ static NSArray<NSString *> *sOCRLanguages1;
 		}];
   }];
   VNImageRequestHandler *handler  = nil;
-  if (textRequest) {
+  if (textRequest)
+  {
 		NSString *ocrLanguage = [[self class] ocrLanguage];
 		if (ocrLanguage)
 		{
@@ -198,7 +222,8 @@ static NSArray<NSString *> *sOCRLanguages1;
   }
 }
 
-- (void)ocrImage:(NSImage *)image {
+- (void)ocrImage:(NSImage *)image
+{
 	if(@available(macOS 10.15, *))
 	{
 		NSData *imageData = image.TIFFRepresentation;
@@ -221,7 +246,8 @@ static NSArray<NSString *> *sOCRLanguages1;
 	}
 }
 
-- (void)ocrCGImage:(CGImageRef)cgImage {
+- (void)ocrCGImage:(CGImageRef)cgImage
+{
 	if(@available(macOS 10.15, *))
 	{
 		dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
@@ -230,9 +256,120 @@ static NSArray<NSString *> *sOCRLanguages1;
 	}
 }
 
+- (void)mouseDown:(NSEvent *)theEvent
+{
+	if (NO)
+	{
+	}
+	else if([self dragIsPossible])
+	{
+		[[NSCursor closedHandCursor] set];
+	}
+}
 
-- (NSString *)selection {
+- (void)mouseMoved:(NSEvent *)theEvent
+{
+	[super mouseMoved:theEvent];
+}
+
+- (void)mouseDragged:(NSEvent *)theEvent
+{
+	NSPoint viewOrigin = [[self enclosingScrollView] documentVisibleRect].origin;
+	NSPoint cursor = [theEvent locationInWindow];
+	NSPoint currentPoint;
+	if (NO)
+	{
+	}
+	else if([self dragIsPossible])
+	{
+		self.isInDrag = YES;
+		while ([theEvent type] != NSEventTypeLeftMouseUp)
+		{
+			if ([theEvent type] == NSEventTypeLeftMouseDragged)
+			{
+				currentPoint = [theEvent locationInWindow];
+				[self scrollPoint: NSMakePoint(viewOrigin.x + cursor.x - currentPoint.x,viewOrigin.y + cursor.y - currentPoint.y)];
+//				[sessionController refreshLoupePanel];
+			}
+			theEvent = [[self window] nextEventMatchingMask: NSEventMaskLeftMouseUp | NSEventMaskLeftMouseDragged];
+		}
+		self.isInDrag = NO;
+		[[self window] invalidateCursorRectsForView: self];
+	}
+}
+
+- (void)mouseUp:(NSEvent *)theEvent
+{
+	if([self dragIsPossible])
+	{
+		[[NSCursor openHandCursor] set];
+	}
+}
+
+
+- (NSString *)selection
+{
 	return nil;
+}
+
+- (BOOL)horizontalScrollIsPossible
+{
+	NSSize total = self.bounds.size;
+	NSSize visible = [[self enclosingScrollView] documentVisibleRect].size;
+	return (visible.width < round(total.width));
+}
+
+
+- (BOOL)verticalScrollIsPossible
+{
+	NSSize total = self.bounds.size;
+	NSSize visible = [[self enclosingScrollView] documentVisibleRect].size;
+	return (visible.height < round(total.height));
+}
+
+
+- (BOOL)dragIsPossible
+{
+	return [self horizontalScrollIsPossible] || [self verticalScrollIsPossible];
+}
+
+- (void)resetCursorRects
+{
+
+	if (@available(macOS 10.15, *))
+	{
+		if (self.textPieces)
+		{
+			CGRect container = [[self enclosingScrollView] documentVisibleRect];
+			NSAffineTransform *transform = [NSAffineTransform transform];
+			[transform scaleXBy:self.bounds.size.width yBy:self.bounds.size.height];
+			for (VNRecognizedTextObservation *piece in self.textPieces)
+			{
+				CGRect r = piece.boundingBox;
+				r.origin = [transform transformPoint:r.origin];
+				r.size = [transform transformSize:r.size];
+				r = CGRectIntersection(r, container);
+				if (!CGRectIsEmpty(r)) {
+					[self addCursorRect:r cursor:[NSCursor IBeamCursor]];
+				}
+			}
+		}
+	}
+
+
+	if([self dragIsPossible])
+	{
+		NSCursor *cursor = self.isInDrag ? [NSCursor closedHandCursor] : [NSCursor openHandCursor];
+		[self addCursorRect: [[self enclosingScrollView] documentVisibleRect] cursor:cursor];
+	}
+//	else if(canCrop)
+//	{
+//		[self addCursorRect: [[self enclosingScrollView] documentVisibleRect] cursor: [NSCursor crosshairCursor]];
+//	}
+	else
+	{
+		[super resetCursorRects];
+	}
 }
 
 @end
