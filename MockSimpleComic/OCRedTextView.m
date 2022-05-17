@@ -26,6 +26,7 @@ static NSString *sOCRLanguage;
 
 static NSArray<NSString *> *sOCRLanguages0;
 static NSArray<NSString *> *sOCRLanguages1;
+static NSSpeechSynthesizer *sSpeechSynthesizer;
 
 typedef enum OCRDragEnum {
 	OCRDragEnumNot,
@@ -121,6 +122,11 @@ typedef enum OCRDragEnum {
 - (void)initOCRedTextView
 {
 	self.selectionPieces = [NSMutableDictionary	dictionary];
+}
+
+- (BOOL)acceptsFirstResponder
+{
+  return YES;
 }
 
 - (void)drawRect:(NSRect)dirtyRect
@@ -359,7 +365,21 @@ typedef enum OCRDragEnum {
 
 - (NSString *)selection
 {
-	return nil;
+	NSMutableArray *a = [NSMutableArray array];
+	if (@available(macOS 10.15, *))
+	{
+		for (VNRecognizedTextObservation *piece in self.textPieces)
+		{
+			NSValue *textValue = [NSValue valueWithPointer:(__bridge const void *)(piece)];
+			OCRSelectionPiece *selectionPair = self.selectionPieces[textValue];
+			if (selectionPair != nil)
+			{
+				NSArray<VNRecognizedText *> *text1 = [piece topCandidates:1];
+				[a addObject:text1.firstObject.string];
+			}
+		}
+	}
+	return [a componentsJoinedByString:@"\n"];
 }
 
 - (BOOL)horizontalScrollIsPossible
@@ -464,5 +484,97 @@ typedef enum OCRDragEnum {
 		[super resetCursorRects];
 	}
 }
+
+- (void)copyToPasteboard:(NSPasteboard *)pboard {
+  NSString *s = [self selection];
+  [pboard clearContents];
+  [pboard setString:s forType:NSPasteboardTypeString];
+}
+
+
+- (BOOL)validateMenuItem:(NSMenuItem *)menuItem
+{
+	if ([menuItem action] == @selector(copy:))
+	{
+		return [self.selectionPieces count] != 0;
+	}
+	else if ([menuItem action] == @selector(selectAll:) || [menuItem action] == @selector(startSpeaking:))
+	{
+		if (@available(macOS 10.15, *))
+		{
+			return [self.textPieces count] != 0 && [self.textPieces count] != [self.selectionPieces count];
+		} else {
+			return NO;
+		}
+	}
+	else if ([menuItem action] == @selector(stopSpeaking:))
+	{
+		return YES;
+	}
+	return NO;
+}
+
+- (void)startSpeaking:(id)sender
+{
+	if (sSpeechSynthesizer == nil)
+	{
+		sSpeechSynthesizer = [[NSSpeechSynthesizer alloc] init];
+	}
+	[sSpeechSynthesizer startSpeakingString:[self selection]];
+}
+
+- (void)stopSpeaking:(id)sender
+{
+	[sSpeechSynthesizer stopSpeaking];
+}
+
+- (void)selectAll:(id)sender
+{
+	if (@available(macOS 10.15, *))
+	{
+		for (VNRecognizedTextObservation *piece in self.textPieces)
+		{
+				NSValue *key = [NSValue valueWithPointer:(__bridge const void *)(piece)];
+				OCRSelectionPiece *selectionPiece = self.selectionPieces[ key ];
+				if (selectionPiece == nil)
+				{
+					selectionPiece = [[OCRSelectionPiece alloc] init];
+					self.selectionPieces[ key ] = selectionPiece;
+				}
+				selectionPiece.start = 0.0;
+				selectionPiece.end = 1.0;
+		}
+		[self setNeedsDisplay:YES];
+		[self.window invalidateCursorRectsForView:self];
+	}
+}
+
+- (void)copy:(id)sender
+{
+  NSPasteboard *pboard = [NSPasteboard generalPasteboard];
+  [self copyToPasteboard:pboard];
+}
+
+- (id)validRequestorForSendType:(NSString *)sendType returnType:(NSString *)returnType
+{
+  if (([sendType isEqual:NSPasteboardTypeString] || [sendType isEqual:NSStringPboardType]) &&
+      [self.selectionPieces count] != 0)
+	{
+    return self;
+  }
+  return [[self nextResponder] validRequestorForSendType:sendType returnType:returnType];
+}
+
+- (BOOL)writeSelectionToPasteboard:(NSPasteboard *)pboard types:(NSArray *)types {
+  if (([types containsObject:NSPasteboardTypeString] || [types containsObject:NSStringPboardType]) &&
+      [self.selectionPieces count] != 0)
+	{
+    [self copyToPasteboard:pboard];
+    return YES;
+  }
+  return NO;
+}
+
+
 
 @end
