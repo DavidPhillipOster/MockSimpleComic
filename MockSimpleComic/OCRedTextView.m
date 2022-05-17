@@ -45,6 +45,7 @@ typedef enum OCRDragEnum {
 @property OCRDragEnum dragKind;
 /// <VNRecognizedTextObservation *> - 10.15 and newer
 @property(nonatomic) NSArray *textPieces;
+@property NSError *ocrError;
 
 /// key is the address of a VNRecognizedTextObservation, value is start,end fractions in 0…1
 @property NSMutableDictionary<NSValue *, OCRSelectionPiece *> *selectionPieces;
@@ -159,6 +160,8 @@ typedef enum OCRDragEnum {
 	}
 }
 
+#pragma mark Model
+
 - (NSString *)allText
 {
 	if (@available(macOS 10.15, *))
@@ -174,6 +177,25 @@ typedef enum OCRDragEnum {
 	return nil;
 }
 
+- (NSString *)selection
+{
+	NSMutableArray *a = [NSMutableArray array];
+	if (@available(macOS 10.15, *))
+	{
+		for (VNRecognizedTextObservation *piece in self.textPieces)
+		{
+			NSValue *textValue = [NSValue valueWithPointer:(__bridge const void *)(piece)];
+			OCRSelectionPiece *selectionPair = self.selectionPieces[textValue];
+			if (selectionPair != nil)
+			{
+				NSArray<VNRecognizedText *> *text1 = [piece topCandidates:1];
+				[a addObject:text1.firstObject.string];
+			}
+		}
+	}
+	return [a componentsJoinedByString:@"\n"];
+}
+
 - (void)setTextPieces:(NSArray *)texts
 {
 	if (_textPieces != texts)
@@ -185,13 +207,56 @@ typedef enum OCRDragEnum {
 	}
 }
 
-- (void)handleTextRequest:(VNRequest *)request
-										error:(NSError *)error
-						 continuation:(void (^)(NSArray *_Nullable idx, NSError *_Nullable error))continuation  API_AVAILABLE(macos(10.15))
+/// For a point, find the textPiece
+///
+/// @param where - a point in View coordinates,
+/// @return the textPiece that contains that point
+- (nullable NSObject *)textPieceForPoint:(CGPoint)where
+{
+	if (@available(macOS 10.15, *))
+	{
+		if (self.textPieces)
+		{
+			CGRect container = [[self enclosingScrollView] documentVisibleRect];
+			for (VNRecognizedTextObservation *piece in self.textPieces)
+			{
+				CGRect r = [self boundBoxOfPiece:piece];
+				r = CGRectIntersection(r, container);
+				if (!CGRectIsEmpty(r) && CGRectContainsPoint(r, where)) {
+					return piece;
+				}
+			}
+		}
+	}
+	return nil;
+}
+
+/// Return the boundbox of a piece in View coordinates
+///
+/// @param piece - A text piece
+/// @return The bound box in View coordinates
+- (CGRect)boundBoxOfPiece:(VNRecognizedTextObservation *)piece API_AVAILABLE(macos(10.15))
+{
+	NSAffineTransform *transform = [NSAffineTransform transform];
+	[transform scaleXBy:self.bounds.size.width yBy:self.bounds.size.height];
+	CGRect r = piece.boundingBox;
+	r.origin = [transform transformPoint:r.origin];
+	r.size = [transform transformSize:r.size];
+	return r;
+}
+
+#pragma mark OCR
+
+/// Called by VNRecognizeTextRequest to process the result.
+/// Filter the textPieces that includes actual text, and store in self.textPieces.
+///
+/// @param request - The VNRecognizeTextRequest
+/// @param error - if non-nil, the VNRecognizeTextRequest is reporting an error.
+- (void)handleTextRequest:(nullable VNRequest *)request error:(nullable NSError *)error API_AVAILABLE(macos(10.15))
 {
 	if (error)
 	{
-		continuation(nil, error);
+		dispatch_async(dispatch_get_main_queue(), ^{ self.textPieces = nil; self.ocrError = error; });
 	}
 	else if ([request isKindOfClass:[VNRecognizeTextRequest class]])
 	{
@@ -210,43 +275,45 @@ typedef enum OCRDragEnum {
 				}
 			}
 		}
-		continuation(pieces, nil);
+		dispatch_async(dispatch_get_main_queue(), ^{ self.textPieces = pieces; self.ocrError = nil; });
 	} else {
 		NSString *desc = @"Unrecognized text request";
 		NSError *err = [NSError errorWithDomain:@"OCRText" code:1 userInfo:@{NSLocalizedDescriptionKey : desc}];
-		continuation(nil, err);
+		dispatch_async(dispatch_get_main_queue(), ^{ self.textPieces = nil; self.ocrError = err; });
 	}
 }
 
-
+/// perform the OCR of the CGImage
+///
+///  make a RequestHandler perform a RecognizeTextRequest, with results processed in the method of this class:
+///  -[handleTextRequest:error:]
+///
+///  @param image - the CGImage
 - (void)actualOCRCGImage:(CGImageRef)image API_AVAILABLE(macos(10.15))
 {
   __weak typeof(self) weakSelf = self;
-  __block NSError *__autoreleasing  _Nullable *errorp = nil;
   VNRecognizeTextRequest *textRequest =
       [[VNRecognizeTextRequest alloc] initWithCompletionHandler:^(VNRequest *request, NSError *error)
-	{
-    [weakSelf handleTextRequest:request error:error continuation:
-      ^(NSArray *_Nullable idx, NSError *_Nullable error){
-			dispatch_async(dispatch_get_main_queue(), ^{
-				weakSelf.textPieces = idx;
-				if (error && errorp)
-				{
-					*errorp = error;
-				}
-			});
-		}];
-  }];
-  VNImageRequestHandler *handler  = nil;
+			{
+				[weakSelf handleTextRequest:request error:error];
+			}];
   if (textRequest)
   {
+		VNImageRequestHandler *handler = nil;
 		NSString *ocrLanguage = [[self class] ocrLanguage];
 		if (ocrLanguage)
 		{
 			textRequest.recognitionLanguages = @[ocrLanguage];
 		}
+		NSError *error = nil;
     handler = [[VNImageRequestHandler alloc] initWithCGImage:image options:@{}];
-		[handler performRequests:@[textRequest] error:errorp];
+		if (![handler performRequests:@[textRequest] error:&error])
+		{
+			self.ocrError = error;
+		}
+  } else {
+		NSString *desc = @"Could not create text request";
+		self.ocrError = [NSError errorWithDomain:@"OCRText" code:2 userInfo:@{NSLocalizedDescriptionKey : desc}];
   }
 }
 
@@ -254,23 +321,23 @@ typedef enum OCRDragEnum {
 {
 	if(@available(macOS 10.15, *))
 	{
-		NSData *imageData = image.TIFFRepresentation;
-		if(imageData != nil)
-		{
-			CGImageSourceRef imageSource = CGImageSourceCreateWithData((__bridge CFDataRef)imageData, NULL);
-			if (imageSource != nil)
+		dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+			NSData *imageData = image.TIFFRepresentation;
+			if(imageData != nil)
 			{
-				CGImageRef imageRef =  CGImageSourceCreateImageAtIndex(imageSource, 0, NULL);
-				if (imageRef != nil)
+				CGImageSourceRef imageSource = CGImageSourceCreateWithData((__bridge CFDataRef)imageData, NULL);
+				if (imageSource != nil)
 				{
-					dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+					CGImageRef imageRef =  CGImageSourceCreateImageAtIndex(imageSource, 0, NULL);
+					if (imageRef != nil)
+					{
 						[self actualOCRCGImage:imageRef];
 						CFRelease(imageRef);
-					});
+					}
+					CFRelease(imageSource);
 				}
-				CFRelease(imageSource);
 			}
-		}
+		});
 	}
 }
 
@@ -283,6 +350,8 @@ typedef enum OCRDragEnum {
 		});
 	}
 }
+
+#pragma mark Mouse
 
 - (void)mouseDown:(NSEvent *)theEvent
 {
@@ -357,79 +426,6 @@ typedef enum OCRDragEnum {
 	}
 }
 
-- (void)mouseUp:(NSEvent *)theEvent
-{
-	if([self dragIsPossible])
-	{
-		[[NSCursor openHandCursor] set];
-	}
-}
-
-
-- (NSString *)selection
-{
-	NSMutableArray *a = [NSMutableArray array];
-	if (@available(macOS 10.15, *))
-	{
-		for (VNRecognizedTextObservation *piece in self.textPieces)
-		{
-			NSValue *textValue = [NSValue valueWithPointer:(__bridge const void *)(piece)];
-			OCRSelectionPiece *selectionPair = self.selectionPieces[textValue];
-			if (selectionPair != nil)
-			{
-				NSArray<VNRecognizedText *> *text1 = [piece topCandidates:1];
-				[a addObject:text1.firstObject.string];
-			}
-		}
-	}
-	return [a componentsJoinedByString:@"\n"];
-}
-
-- (BOOL)horizontalScrollIsPossible
-{
-	NSSize total = self.bounds.size;
-	NSSize visible = [[self enclosingScrollView] documentVisibleRect].size;
-	return (visible.width < round(total.width));
-}
-
-
-- (BOOL)verticalScrollIsPossible
-{
-	NSSize total = self.bounds.size;
-	NSSize visible = [[self enclosingScrollView] documentVisibleRect].size;
-	return (visible.height < round(total.height));
-}
-
-- (nullable NSObject *)textPieceForPoint:(CGPoint)where
-{
-	if (@available(macOS 10.15, *))
-	{
-		if (self.textPieces)
-		{
-			CGRect container = [[self enclosingScrollView] documentVisibleRect];
-			for (VNRecognizedTextObservation *piece in self.textPieces)
-			{
-				CGRect r = [self boundBoxOfPiece:piece];
-				r = CGRectIntersection(r, container);
-				if (!CGRectIsEmpty(r) && CGRectContainsPoint(r, where)) {
-					return piece;
-				}
-			}
-		}
-	}
-	return nil;
-}
-
-- (CGRect)boundBoxOfPiece:(VNRecognizedTextObservation *)piece  API_AVAILABLE(macos(10.15))
-{
-	NSAffineTransform *transform = [NSAffineTransform transform];
-	[transform scaleXBy:self.bounds.size.width yBy:self.bounds.size.height];
-	CGRect r = piece.boundingBox;
-	r.origin = [transform transformPoint:r.origin];
-	r.size = [transform transformSize:r.size];
-	return r;
-}
-
 - (void)trackTextPiece:(NSObject *)textPieceObject atPoint:(NSPoint)where
 {
 	if (@available(macOS 10.15, *))
@@ -449,6 +445,28 @@ typedef enum OCRDragEnum {
 	}
 }
 
+- (void)mouseUp:(NSEvent *)theEvent
+{
+	if([self dragIsPossible])
+	{
+		[[NSCursor openHandCursor] set];
+	}
+}
+
+- (BOOL)horizontalScrollIsPossible
+{
+	NSSize total = self.bounds.size;
+	NSSize visible = [[self enclosingScrollView] documentVisibleRect].size;
+	return (visible.width < round(total.width));
+}
+
+
+- (BOOL)verticalScrollIsPossible
+{
+	NSSize total = self.bounds.size;
+	NSSize visible = [[self enclosingScrollView] documentVisibleRect].size;
+	return (visible.height < round(total.height));
+}
 
 - (BOOL)dragIsPossible
 {
@@ -490,13 +508,7 @@ typedef enum OCRDragEnum {
 	}
 }
 
-- (void)copyToPasteboard:(NSPasteboard *)pboard
-{
-  NSString *s = [self selection];
-  [pboard clearContents];
-  [pboard setString:s forType:NSPasteboardTypeString];
-}
-
+#pragma mark Menubar
 
 - (BOOL)validateMenuItem:(NSMenuItem *)menuItem
 {
@@ -560,6 +572,15 @@ typedef enum OCRDragEnum {
   NSPasteboard *pboard = [NSPasteboard generalPasteboard];
   [self copyToPasteboard:pboard];
 }
+
+- (void)copyToPasteboard:(NSPasteboard *)pboard
+{
+  NSString *s = [self selection];
+  [pboard clearContents];
+  [pboard setString:s forType:NSPasteboardTypeString];
+}
+
+#pragma mark Services
 
 - (id)validRequestorForSendType:(NSString *)sendType returnType:(NSString *)returnType
 {
