@@ -8,6 +8,18 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+// OCRedTextView use this NSError Domain
+extern NSErrorDomain const OCRedTextDomain;
+
+enum {
+	OCRedTextErrUnrecognized = 1,
+	OCRedTextErrNoCreate,
+	OCRedTextErrNotAvailable
+};
+
+// Sent when OCR'ing is complete. Object is the OCRedTextView.
+extern NSNotificationName const OCRTextCompleteNotification;
+
 @interface OCRedTextView : NSView
 /// The list of languages the VisionFramework will accept. en_US is the default. Empty array means the VisionFramework is not available.
 @property(class, readonly) NSArray<NSString *> *ocrLanguages;
@@ -20,6 +32,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// all the text on the page. nil if not available.
 @property(readonly, nullable) NSString *allText;
+
+/// non-nil if an error occurred OCR'ing the image.
+@property(readonly, nullable) NSError *ocrError;
 
 /// Run the ocr engine on the image in the default language.
 - (void)ocrImage:(NSImage *)image;

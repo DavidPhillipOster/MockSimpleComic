@@ -43,11 +43,18 @@ typedef enum OCRDragEnum {
 	OCRDragEnumIBeam
 } OCRDragEnum;
 
+// ocrErrors use this NSError Domain
+NSErrorDomain const OCRedTextDomain = @"OCRedTextDomain";
+
+// Sent when OCR'ing is complete. Object is the OCRedTextView.
+NSNotificationName const OCRTextCompleteNotification = @"OCRTextCompleteNotification";
+
+
 @interface OCRedTextView()
 @property OCRDragEnum dragKind;
 /// <VNRecognizedTextObservation *> - 10.15 and newer
 @property(nonatomic) NSArray *textPieces;
-@property NSError *ocrError;
+@property(nonatomic, readwrite, setter=setOCRError:) NSError *ocrError;
 
 /// <VNRecognizedTextObservation *> - 10.15 and newer
 @property NSMutableSet *selectionPieces;
@@ -189,6 +196,13 @@ typedef enum OCRDragEnum {
 	return [a componentsJoinedByString:@"\n"];
 }
 
+/// Note to maintainers: always set the error as the last step in OCR'ing. If no error, set it to nil.
+- (void)setOCRError:(NSError *)ocrError {
+	_ocrError = ocrError;
+	NSNotificationCenter *nc = [NSNotificationCenter defaultCenter];
+	[nc postNotificationName:OCRTextCompleteNotification object:self];
+}
+
 - (void)setTextPieces:(NSArray *)texts
 {
 	if (_textPieces != texts)
@@ -279,7 +293,9 @@ typedef enum OCRDragEnum {
 		dispatch_async(dispatch_get_main_queue(), ^{ self.textPieces = pieces; self.ocrError = nil; });
 	} else {
 		NSString *desc = @"Unrecognized text request";
-		NSError *err = [NSError errorWithDomain:@"OCRText" code:1 userInfo:@{NSLocalizedDescriptionKey : desc}];
+		NSError *err = [NSError errorWithDomain:OCRedTextDomain
+																			 code:OCRedTextErrUnrecognized
+																	 userInfo:@{NSLocalizedDescriptionKey : desc}];
 		dispatch_async(dispatch_get_main_queue(), ^{ self.textPieces = nil; self.ocrError = err; });
 	}
 }
@@ -315,9 +331,21 @@ typedef enum OCRDragEnum {
 		}
   } else {
 		NSString *desc = @"Could not create text request";
-		NSError *err = [NSError errorWithDomain:@"OCRText" code:2 userInfo:@{NSLocalizedDescriptionKey : desc}];
+		NSError *err = [NSError errorWithDomain:OCRedTextDomain
+																			 code:OCRedTextErrNoCreate
+																	 userInfo:@{NSLocalizedDescriptionKey : desc}];
 		dispatch_async(dispatch_get_main_queue(), ^{ self.ocrError = err; });
   }
+}
+
+- (void)setNotAvailableError
+{
+	NSString *desc = @"Requires macOS 10.15 or newer.";
+	NSError *err = [NSError errorWithDomain:OCRedTextDomain
+																		 code:OCRedTextErrNoCreate
+																 userInfo:@{NSLocalizedDescriptionKey : desc}];
+	/// As a side effect, sends 'done' notification.
+	self.ocrError = err;
 }
 
 - (void)ocrImage:(NSImage *)image
@@ -341,6 +369,8 @@ typedef enum OCRDragEnum {
 				}
 			}
 		});
+	} else {
+		[self setNotAvailableError];
 	}
 }
 
@@ -351,6 +381,8 @@ typedef enum OCRDragEnum {
 		dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
 			[self actualOCRCGImage:cgImage];
 		});
+	} else {
+		[self setNotAvailableError];
 	}
 }
 
