@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		633A0D5F2834121F00AA4C08 /* OCRGraphicsMath.m in Sources */ = {isa = PBXBuildFile; fileRef = 633A0D5D2834121F00AA4C08 /* OCRGraphicsMath.m */; };
 		63EE68532832ADA300FDA444 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 63EE68522832ADA300FDA444 /* AppDelegate.m */; };
 		63EE68552832ADA500FDA444 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 63EE68542832ADA500FDA444 /* Assets.xcassets */; };
 		63EE68582832ADA500FDA444 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 63EE68562832ADA500FDA444 /* MainMenu.xib */; };
@@ -18,8 +17,6 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		633A0D5D2834121F00AA4C08 /* OCRGraphicsMath.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = OCRGraphicsMath.m; sourceTree = "<group>"; };
-		633A0D5E2834121F00AA4C08 /* OCRGraphicsMath.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OCRGraphicsMath.h; sourceTree = "<group>"; };
 		63EE684E2832ADA300FDA444 /* MockSimpleComic.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MockSimpleComic.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		63EE68512832ADA300FDA444 /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
 		63EE68522832ADA300FDA444 /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
@@ -69,8 +66,6 @@
 				63EE68522832ADA300FDA444 /* AppDelegate.m */,
 				63EE686A2832BF8D00FDA444 /* OCRedTextView.h */,
 				63EE686B2832BF8D00FDA444 /* OCRedTextView.m */,
-				633A0D5E2834121F00AA4C08 /* OCRGraphicsMath.h */,
-				633A0D5D2834121F00AA4C08 /* OCRGraphicsMath.m */,
 				63EE68542832ADA500FDA444 /* Assets.xcassets */,
 				63EE68612832ADD300FDA444 /* test.jpg */,
 				63EE68562832ADA500FDA444 /* MainMenu.xib */,
@@ -161,7 +156,6 @@
 				63EE686C2832BF8D00FDA444 /* OCRedTextView.m in Sources */,
 				63EE685A2832ADA500FDA444 /* main.m in Sources */,
 				63EE68532832ADA300FDA444 /* AppDelegate.m in Sources */,
-				633A0D5F2834121F00AA4C08 /* OCRGraphicsMath.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
