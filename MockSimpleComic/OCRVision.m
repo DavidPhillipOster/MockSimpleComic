@@ -102,7 +102,7 @@ NSErrorDomain const OCRVisionDomain = @"OCRVisionDomain";
 - (void)callCompletion:(void (^)(OCRVisionComplete * _Nonnull))completion textPieces:(NSArray *)textPieces error:(NSError *)error
 {
 	OCRVisionComplete *visionComplete = [[OCRVisionComplete alloc] init];
-	visionComplete.textPieces = textPieces;
+	visionComplete.textPieces = textPieces ?: @[];
 	visionComplete.ocrError = error;
 	completion(visionComplete);
 }
