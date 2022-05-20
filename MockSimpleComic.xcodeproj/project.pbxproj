@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		6369E4EF2836F46500E7EBA8 /* OCRVision.m in Sources */ = {isa = PBXBuildFile; fileRef = 6369E4EE2836F46500E7EBA8 /* OCRVision.m */; };
 		63EE68532832ADA300FDA444 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 63EE68522832ADA300FDA444 /* AppDelegate.m */; };
 		63EE68552832ADA500FDA444 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 63EE68542832ADA500FDA444 /* Assets.xcassets */; };
 		63EE68582832ADA500FDA444 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 63EE68562832ADA500FDA444 /* MainMenu.xib */; };
@@ -17,6 +18,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		6369E4ED2836F46500E7EBA8 /* OCRVision.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OCRVision.h; sourceTree = "<group>"; };
+		6369E4EE2836F46500E7EBA8 /* OCRVision.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = OCRVision.m; sourceTree = "<group>"; };
 		63EE684E2832ADA300FDA444 /* MockSimpleComic.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MockSimpleComic.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		63EE68512832ADA300FDA444 /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
 		63EE68522832ADA300FDA444 /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
@@ -66,6 +69,8 @@
 				63EE68522832ADA300FDA444 /* AppDelegate.m */,
 				63EE686A2832BF8D00FDA444 /* OCRedTextView.h */,
 				63EE686B2832BF8D00FDA444 /* OCRedTextView.m */,
+				6369E4ED2836F46500E7EBA8 /* OCRVision.h */,
+				6369E4EE2836F46500E7EBA8 /* OCRVision.m */,
 				63EE68542832ADA500FDA444 /* Assets.xcassets */,
 				63EE68612832ADD300FDA444 /* test.jpg */,
 				63EE68562832ADA500FDA444 /* MainMenu.xib */,
@@ -155,6 +160,7 @@
 			files = (
 				63EE686C2832BF8D00FDA444 /* OCRedTextView.m in Sources */,
 				63EE685A2832ADA500FDA444 /* main.m in Sources */,
+				6369E4EF2836F46500E7EBA8 /* OCRVision.m in Sources */,
 				63EE68532832ADA300FDA444 /* AppDelegate.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

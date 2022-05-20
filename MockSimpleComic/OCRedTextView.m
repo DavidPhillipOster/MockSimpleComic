@@ -6,6 +6,7 @@
 
 #import "OCRedTextView.h"
 
+#import "OCRVision.h"
 #import <Vision/Vision.h>
 
 /// @return the quadrilateral of the text observation as a NSBezierPath/
@@ -32,9 +33,6 @@ static NSRect RectFrom2Points(NSPoint a, NSPoint b)
 	return r;
 }
 
-static NSString *sOCRLanguage;
-
-static NSArray<NSString *> *sOCRLanguages;
 static NSSpeechSynthesizer *sSpeechSynthesizer;
 
 typedef enum OCRDragEnum {
@@ -43,18 +41,11 @@ typedef enum OCRDragEnum {
 	OCRDragEnumIBeam
 } OCRDragEnum;
 
-// ocrErrors use this NSError Domain
-NSErrorDomain const OCRedTextDomain = @"OCRedTextDomain";
-
-// Sent when OCR'ing is complete. Object is the OCRedTextView.
-NSNotificationName const OCRTextCompleteNotification = @"OCRTextCompleteNotification";
-
-
 @interface OCRedTextView()
 @property OCRDragEnum dragKind;
+
 /// <VNRecognizedTextObservation *> - 10.15 and newer
-@property(nonatomic) NSArray *textPieces;
-@property(nonatomic, readwrite, setter=setOCRError:) NSError *ocrError;
+@property NSArray *textPieces;
 
 /// <VNRecognizedTextObservation *> - 10.15 and newer
 @property NSMutableSet *selectionPieces;
@@ -62,54 +53,6 @@ NSNotificationName const OCRTextCompleteNotification = @"OCRTextCompleteNotifica
 @end
 
 @implementation OCRedTextView
-
-+ (void)initialize
-{
-	[super initialize];
-	static dispatch_once_t onceToken;
-	dispatch_once(&onceToken, ^{
-		if (@available(macOS 10.15, *))
-		{
-			NSUInteger revision = VNRecognizeTextRequestRevision1;
-			if (@available(macOS 11.0, *))
-			{
-				revision = VNRecognizeTextRequestRevision2;
-			}
-			if (@available(macOS 12.0, *))
-			{
-				VNRecognizeTextRequest *textRequest = [[VNRecognizeTextRequest alloc] initWithCompletionHandler:^(VNRequest *request, NSError *error){}];
-				sOCRLanguages = [textRequest supportedRecognitionLanguagesAndReturnError:nil];
-			} else {
-				sOCRLanguages = [VNRecognizeTextRequest supportedRecognitionLanguagesForTextRecognitionLevel:VNRequestTextRecognitionLevelAccurate revision:revision error:NULL];
-			}
-			sOCRLanguage = sOCRLanguages.firstObject;
-		}
-	});
-}
-
-+ (NSArray<NSString *> *)ocrLanguages
-{
-	if (nil == sOCRLanguages){ return @[]; }
-	return sOCRLanguages;
-}
-
-+ (NSString *)ocrLanguage
-{
-	return sOCRLanguage;
-}
-
-+ (void)setOCRLanguage:(NSString *)ocrLanguage
-{
-	if (nil != ocrLanguage)
-	{
-		if ([[self ocrLanguages] containsObject:ocrLanguage])
-		{
-			sOCRLanguage = ocrLanguage;
-		}
-	} else {
-		sOCRLanguage = sOCRLanguages.firstObject;
-	}
-}
 
 - (instancetype)initWithCoder:(NSCoder *)coder
 {
@@ -196,24 +139,6 @@ NSNotificationName const OCRTextCompleteNotification = @"OCRTextCompleteNotifica
 	return [a componentsJoinedByString:@"\n"];
 }
 
-/// Note to maintainers: always set the error as the last step in OCR'ing. If no error, set it to nil.
-- (void)setOCRError:(NSError *)ocrError {
-	_ocrError = ocrError;
-	NSNotificationCenter *nc = [NSNotificationCenter defaultCenter];
-	[nc postNotificationName:OCRTextCompleteNotification object:self];
-}
-
-- (void)setTextPieces:(NSArray *)texts
-{
-	if (_textPieces != texts)
-	{
-		_textPieces = texts;
-		[self.selectionPieces removeAllObjects];
-		[self setNeedsDisplay:YES];
-		[self.window invalidateCursorRectsForView:self];
-	}
-}
-
 - (nullable NSObject *)textPieceForMouseEvent:(NSEvent *)theEvent
 {
 	NSPoint where = [self convertPoint:[theEvent locationInWindow] fromView:nil];
@@ -260,131 +185,36 @@ NSNotificationName const OCRTextCompleteNotification = @"OCRTextCompleteNotifica
 
 #pragma mark OCR
 
-/// Called by VNRecognizeTextRequest to process the result.
-/// Filter the textPieces that includes actual text, and store in self.textPieces.
-///
-///  Since this is called on a worker queue, it delivers results on the main queue.
-///
-/// @param request - The VNRecognizeTextRequest
-/// @param error - if non-nil, the VNRecognizeTextRequest is reporting an error.
-- (void)handleTextRequest:(nullable VNRequest *)request error:(nullable NSError *)error API_AVAILABLE(macos(10.15))
+- (void)ocrDidFinish:(OCRVisionComplete *)complete
 {
-	if (error)
-	{
-		dispatch_async(dispatch_get_main_queue(), ^{ self.textPieces = nil; self.ocrError = error; });
-	}
-	else if ([request isKindOfClass:[VNRecognizeTextRequest class]])
-	{
-		VNRecognizeTextRequest *textRequests = (VNRecognizeTextRequest *)request;
-		NSMutableArray<VNRecognizedTextObservation *> *pieces = [NSMutableArray array];
-		NSArray *results = textRequests.results;
-		for (id rawResult in results)
-		{
-			if ([rawResult isKindOfClass:[VNRecognizedTextObservation class]])
-			{
-				VNRecognizedTextObservation *textO = (VNRecognizedTextObservation *)rawResult;
-				NSArray<VNRecognizedText *> *text1 = [textO topCandidates:1];
-				if (text1.count)
-				{
-					[pieces addObject:textO];
-				}
-			}
+	dispatch_async(dispatch_get_main_queue(), ^{
+		if (@available(macOS 10.15, *)) {
+			self.textPieces = complete.textObservations;
 		}
-		dispatch_async(dispatch_get_main_queue(), ^{ self.textPieces = pieces; self.ocrError = nil; });
-	} else {
-		NSString *desc = @"Unrecognized text request";
-		NSError *err = [NSError errorWithDomain:OCRedTextDomain
-																			 code:OCRedTextErrUnrecognized
-																	 userInfo:@{NSLocalizedDescriptionKey : desc}];
-		dispatch_async(dispatch_get_main_queue(), ^{ self.textPieces = nil; self.ocrError = err; });
-	}
-}
-
-/// perform the OCR of the CGImage
-///
-///  make a RequestHandler perform a RecognizeTextRequest, with results processed in the method of this class:
-///  -[handleTextRequest:error:]
-///
-///  Since this is called on a worker queue, it delivers results on the main queue.
-///
-///  @param image - the CGImage
-- (void)actualOCRCGImage:(CGImageRef)image API_AVAILABLE(macos(10.15))
-{
-  __weak typeof(self) weakSelf = self;
-  VNRecognizeTextRequest *textRequest =
-      [[VNRecognizeTextRequest alloc] initWithCompletionHandler:^(VNRequest *request, NSError *error)
-			{
-				[weakSelf handleTextRequest:request error:error];
-			}];
-  if (textRequest)
-  {
-		NSString *ocrLanguage = [[self class] ocrLanguage];
-		if (ocrLanguage)
-		{
-			textRequest.recognitionLanguages = @[ocrLanguage];
-		}
-		NSError *error = nil;
-    VNImageRequestHandler *handler = [[VNImageRequestHandler alloc] initWithCGImage:image options:@{}];
-		if (![handler performRequests:@[textRequest] error:&error])
-		{
-			dispatch_async(dispatch_get_main_queue(), ^{ self.ocrError = error; });
-		}
-  } else {
-		NSString *desc = @"Could not create text request";
-		NSError *err = [NSError errorWithDomain:OCRedTextDomain
-																			 code:OCRedTextErrNoCreate
-																	 userInfo:@{NSLocalizedDescriptionKey : desc}];
-		dispatch_async(dispatch_get_main_queue(), ^{ self.ocrError = err; });
-  }
-}
-
-- (void)setNotAvailableError
-{
-	NSString *desc = @"Requires macOS 10.15 or newer.";
-	NSError *err = [NSError errorWithDomain:OCRedTextDomain
-																		 code:OCRedTextErrNoCreate
-																 userInfo:@{NSLocalizedDescriptionKey : desc}];
-	/// As a side effect, sends 'done' notification.
-	self.ocrError = err;
+		[self.selectionPieces removeAllObjects];
+		[self setNeedsDisplay:YES];
+		[self.window invalidateCursorRectsForView:self];
+	});
 }
 
 - (void)ocrImage:(NSImage *)image
 {
-	if(@available(macOS 10.15, *))
-	{
-		dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
-			NSData *imageData = image.TIFFRepresentation;
-			if(imageData != nil)
-			{
-				CGImageSourceRef imageSource = CGImageSourceCreateWithData((__bridge CFDataRef)imageData, NULL);
-				if (imageSource != nil)
-				{
-					CGImageRef imageRef =  CGImageSourceCreateImageAtIndex(imageSource, 0, NULL);
-					if (imageRef != nil)
-					{
-						[self actualOCRCGImage:imageRef];
-						CFRelease(imageRef);
-					}
-					CFRelease(imageSource);
-				}
-			}
-		});
-	} else {
-		[self setNotAvailableError];
-	}
+	__block OCRVision *ocrVision = [[OCRVision alloc] init];
+	[ocrVision ocrImage:image completion:^(OCRVisionComplete * _Nonnull complete) {
+		[self ocrDidFinish:complete];
+		ocrVision = nil;
+	}];
 }
 
 - (void)ocrCGImage:(CGImageRef)cgImage
 {
-	if(@available(macOS 10.15, *))
-	{
-		dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
-			[self actualOCRCGImage:cgImage];
-		});
-	} else {
-		[self setNotAvailableError];
-	}
+	__block OCRVision *ocrVision = [[OCRVision alloc] init];
+	[ocrVision ocrCGImage:cgImage completion:^(OCRVisionComplete * _Nonnull complete) {
+		[self ocrDidFinish:complete];
+		ocrVision = nil;
+	}];
 }
+
 
 #pragma mark Mouse
 

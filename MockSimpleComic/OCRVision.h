@@ -1,7 +1,6 @@
-//  OCRedTextView.h
-//  MockSimpleComic
+//  OCRVision.h
 //
-//  Created by David Phillip Oster on 5/16/22.
+//  Created by David Phillip Oster on 5/19/2022
 //
 
 #import <Cocoa/Cocoa.h>
@@ -9,38 +8,57 @@
 NS_ASSUME_NONNULL_BEGIN
 
 // OCRedTextView use this NSError Domain
-extern NSErrorDomain const OCRedTextDomain;
+extern NSErrorDomain const OCRVisionDomain;
 
 enum {
-	OCRedTextErrUnrecognized = 1,
-	OCRedTextErrNoCreate,
-	OCRedTextErrNotAvailable
+	OCRVisionErrUnrecognized = 1,
+	OCRVisionErrNoCreate,
+	OCRVisionErrNotAvailable
 };
 
-// Sent when OCR'ing is complete. Object is the OCRedTextView.
-extern NSNotificationName const OCRTextCompleteNotification;
+@class VNRecognizedTextObservation;
 
-@interface OCRedTextView : NSView
+/// When the  OCR is complete, it will pass your continuation block an object that resp.
+///
+/// Usage note: you should make a new OCRVision for each image. You can release it when you've gotten the text out of it.
+@interface OCRVisionComplete :NSObject
+
+/// all the text on the page. nil if not available.
+@property(readonly) NSString *allText;
+
+/// non-nil if an error occurred OCR'ing the image.
+@property(readonly, nullable) NSError *ocrError;
+
+/// Once an OCR operation completes, the individual lines of text.
+- (NSArray<VNRecognizedTextObservation *> *)textObservations API_AVAILABLE(macos(10.15));
+
+@end
+
+/// Wrap up the Vision OCR framework in a  simple API
+@interface OCRVision : NSObject
+
 /// The list of languages the VisionFramework will accept. en_US is the default. Empty array means the VisionFramework is not available.
 @property(class, readonly) NSArray<NSString *> *ocrLanguages;
 
 /// The language the VisionFramework will use. getting nil means the VisionFramework is not available. setting nil restores default.
 @property(class, nullable, setter=setOCRLanguage:) NSString *ocrLanguage;
 
-/// The selected text as a single string. Readonly, because it is selected using the mouse. nil if not available.
-@property(readonly, nullable) NSString *selection;
 
-/// all the text on the page. nil if not available.
-@property(readonly, nullable) NSString *allText;
+/// Run the ocr engine on the image in the default language. When it's done, call the completion passing an object that implements the OCRVisionComplete protocol
+///
+///  Note: does its work on a background concurrent GCD queue. Completion is called on that queue.
+///
+/// @param image - the image to OCR
+/// @param completion - a block passed an object that corresponds to the OCRVision protocol.
+- (void)ocrImage:(NSImage *)image completion:(void (^)(OCRVisionComplete * _Nonnull ocrDone))completion;
 
-/// non-nil if an error occurred OCR'ing the image.
-@property(readonly, nullable) NSError *ocrError;
-
-/// Run the ocr engine on the image in the default language.
-- (void)ocrImage:(NSImage *)image;
-
-/// Run the ocr engine on the CGimage in the default language.
-- (void)ocrCGImage:(CGImageRef)cgImage;
+/// Run the ocr engine on the image in the default language. When it's done, call the completion passing an object that implements the OCRVisionComplete protocol
+///
+///  Note: does its work on a background concurrent GCD queue. Completion is called on that queue.
+///
+/// @param cgImage - the image to OCR
+/// @param completion - a block passed an object that corresponds to the OCRVision protocol.
+- (void)ocrCGImage:(CGImageRef)cgImage completion:(void (^)(OCRVisionComplete * _Nonnull ocrDone))completion;
 
 @end
 

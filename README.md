@@ -10,6 +10,9 @@ with a yellow tint.
 It runs the Vision.framework OCR engine. Once that completes, you can use the mouse to select
 text in place (look for the i-Beam cursor), and it tints just the places where it recognized text.
 
+All of the actual OCRing is moved off to a OCRVision object, which provides a simple API for
+OCRing.
+
 This app creates a VNRecognizeTextRequest to recognize all the text in an image. That's all you need
 to select individual lines of text in the image, or if you just need the text to
 index it for Spotlight. If you want to mouse select not lines, but individual words, use a
