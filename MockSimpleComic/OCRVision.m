@@ -21,7 +21,8 @@ NSErrorDomain const OCRVisionDomain = @"OCRVisionDomain";
 
 @implementation OCRVisionComplete
 
-- (NSArray<VNRecognizedTextObservation *> *)textObservations API_AVAILABLE(macos(10.15)){
+- (NSArray<VNRecognizedTextObservation *> *)textObservations
+{
 	return _textPieces ?: @[];
 }
 

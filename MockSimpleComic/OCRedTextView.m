@@ -298,7 +298,6 @@ typedef enum OCRDragEnum {
 - (void)mouseDragText:(NSEvent *)theEvent textPiece:(NSObject *)textPiece
 {
 	NSPoint startPoint = [self convertPoint:[theEvent locationInWindow] fromView:nil];
-	NSRect downRect = NSMakeRect(startPoint.x, startPoint.y, 0, 0);
 	self.dragKind = OCRDragEnumIBeam;
 	NSMutableSet *previousSelection = [NSMutableSet set];
 	if (theEvent.modifierFlags & NSEventModifierFlagCommand)
@@ -312,7 +311,7 @@ typedef enum OCRDragEnum {
 		if ([theEvent type] == NSEventTypeLeftMouseDragged)
 		{
 			NSPoint endPoint = [self convertPoint:[theEvent locationInWindow] fromView:nil];
-			downRect = RectFrom2Points(startPoint, endPoint);
+			NSRect downRect = RectFrom2Points(startPoint, endPoint);
 			[self updateSelectionFromDownRect:downRect previousSelection:previousSelection];
 		}
 		theEvent = [[self window] nextEventMatchingMask: NSEventMaskLeftMouseUp | NSEventMaskLeftMouseDragged];
