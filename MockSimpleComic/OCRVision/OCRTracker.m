@@ -46,6 +46,21 @@ static NSRect RectFrom2Points(NSPoint a, NSPoint b)
 	return r;
 }
 
+/// @return the set of indices into a string such that s[index] is at the near the beginning or end of a whitespace delimited 'word'
+static NSIndexSet *WordsBoundariesOfString(NSString *s)
+{
+	NSMutableIndexSet *indicies = [NSMutableIndexSet indexSetWithIndex:0];
+	[indicies addIndex:s.length];
+	NSScanner *scanner = [[NSScanner alloc] initWithString:s];
+	NSCharacterSet *textChars = [[NSCharacterSet whitespaceAndNewlineCharacterSet] invertedSet];
+	while ([scanner scanCharactersFromSet:textChars intoString:NULL])
+	{
+		[indicies addIndex:scanner.scanLocation];
+	}
+	return indicies;
+}
+
+
 static NSSpeechSynthesizer *sSpeechSynthesizer;
 
 typedef enum OCRDragEnum {
@@ -60,7 +75,8 @@ typedef enum OCRDragEnum {
 /// <VNRecognizedTextObservation *> - 10.15 and newer
 @property NSArray *textPieces;
 
-/// <VNRecognizedTextObservation *, valueWithRange> - 10.15 and newer
+// Key is VNRecognizedTextObservation.
+// The is the range of the underlying string to show as selected.
 @property NSMutableDictionary<NSObject *, NSValue *> *selectionPieces;
 
 @property (weak, nullable) NSView *view;
@@ -96,10 +112,13 @@ typedef enum OCRDragEnum {
 {
 	if (self.textPieces == nil)
 	{
-		// temporary, to show we haven't run the OCR yet.
-		[[NSColor.yellowColor colorWithAlphaComponent:0.4] set];
-		CGRect smallBounds = CGRectInset(self.view.bounds, 20, 20);
-		NSRectFill(smallBounds);
+		if (@available(macOS 10.15, *))
+		{
+			// temporary, to show we haven't run the OCR yet.
+			[[NSColor.yellowColor colorWithAlphaComponent:0.4] set];
+			CGRect smallBounds = CGRectInset(self.view.bounds, 20, 20);
+			NSRectFill(smallBounds);
+		}
 	} else {
 		if (@available(macOS 10.15, *))
 		{
@@ -144,11 +163,13 @@ typedef enum OCRDragEnum {
 	{
 		for (VNRecognizedTextObservation *piece in self.textPieces)
 		{
-			NSValue *rangeValue = self.selectionPieces[piece];
-			if (rangeValue != nil)
+			NSValue *rangeInAValue = self.selectionPieces[piece];
+			if (rangeInAValue != nil)
 			{
 				NSArray<VNRecognizedText *> *text1 = [piece topCandidates:1];
-				[a addObject:text1.firstObject.string];
+				NSString *s = text1.firstObject.string;
+				s = [s substringWithRange:[rangeInAValue rangeValue]];
+				[a addObject:s];
 			}
 		}
 	}
@@ -198,6 +219,23 @@ typedef enum OCRDragEnum {
 	r.size = [transform transformSize:r.size];
 	return r;
 }
+
+/// Return the boundbox of a range of a piece in View coordinates
+///
+/// @param piece - A text piece
+/// @param charRange - the range within the piece.
+/// @return The bound box in View coordinates
+- (CGRect)boundBoxOfPiece:(VNRecognizedTextObservation *)piece range:(NSRange)charRange API_AVAILABLE(macos(10.15))
+{
+	NSAffineTransform *transform = [NSAffineTransform transform];
+	[transform scaleXBy:self.view.bounds.size.width yBy:self.view.bounds.size.height];
+	NSBezierPath *path = BezierPathFromTextObservationRange(piece, charRange);
+	CGRect r = path.bounds;
+	r.origin = [transform transformPoint:r.origin];
+	r.size = [transform transformSize:r.size];
+	return r;
+}
+
 
 #pragma mark OCR
 
@@ -329,20 +367,7 @@ typedef enum OCRDragEnum {
 		{
 			CGRect pieceR = [self boundBoxOfPiece:piece];
 			if (CGRectIntersectsRect(downRect, pieceR)) {
-				VNRecognizedText *text1 = [[piece topCandidates:1] firstObject];
-				NSString *s = text1.string;
-				NSMutableArray<NSString *> *a = [[s componentsSeparatedByString:@" "] mutableCopy];
-				NSInteger start = 0;
-				NSInteger length = s.length;
-#if 1	// experiment: Prove I can hilite a word at a time by not hiliting the first and last word.
-				if (3 < a.count) {
-					start = a.firstObject.length + 1;
-					[a removeObjectAtIndex:0];
-					[a removeLastObject];
-					length = [[a componentsJoinedByString:@" "] length];
-				}
-#endif
-				NSRange r = NSMakeRange(start, length);
+				NSRange r = [self rangeOfPiece:piece intersectsRect:downRect];
 				selectionSet[piece] = [NSValue valueWithRange:r];
 				previousSelection[piece] = nil;
 			}
@@ -355,6 +380,46 @@ typedef enum OCRDragEnum {
 		}
 	}
 }
+
+- (NSRange)rangeOfPiece:(VNRecognizedTextObservation *)piece intersectsRect:(NSRect)downRect API_AVAILABLE(macos(10.15))
+{
+	VNRecognizedText *text1 = [[piece topCandidates:1] firstObject];
+	NSString *s = text1.string;
+	NSIndexSet *wordStarts = WordsBoundariesOfString(s);
+	NSInteger start = 0;
+	NSInteger end = s.length;
+	NSInteger i = [wordStarts indexGreaterThanIndex:0];
+	NSInteger iAnchor = wordStarts.lastIndex;
+	NSInteger iPrevious = 0;
+	for (; i<iAnchor; i = [wordStarts indexGreaterThanIndex:i])
+	{
+		NSRange wordRange = NSMakeRange(iPrevious, i - iPrevious);
+		CGRect wordR = [self boundBoxOfPiece:piece range:wordRange];
+		if (CGRectIntersectsRect(downRect, wordR))
+		{
+			start = iPrevious;
+			break;
+		}
+		iPrevious = i;
+	}
+	iPrevious = s.length;
+	i = [wordStarts indexLessThanIndex:iPrevious];
+	iAnchor = wordStarts.firstIndex;
+	for (;iAnchor <= i; i = [wordStarts indexLessThanIndex:i])
+	{
+		NSRange wordRange = NSMakeRange(i, iPrevious - i);
+		CGRect wordR = [self boundBoxOfPiece:piece range:wordRange];
+		if (CGRectIntersectsRect(downRect, wordR))
+		{
+			end = iPrevious;
+			break;
+		}
+		iPrevious = i;
+	}
+	return NSMakeRange(start, end - start);
+}
+
+
 
 - (BOOL)didResetCursorRects
 {
