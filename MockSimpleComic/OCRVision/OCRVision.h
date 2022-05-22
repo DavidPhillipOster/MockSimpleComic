@@ -12,16 +12,13 @@ extern NSErrorDomain const OCRVisionDomain;
 
 enum {
 	OCRVisionErrUnrecognized = 1,
-	OCRVisionErrNoCreate,
-	OCRVisionErrNotAvailable
+	OCRVisionErrNoCreate
 };
 
 @class VNRecognizedTextObservation;
 
-/// When the  OCR is complete, it will pass your continuation block an object that resp.
-///
-/// Usage note: you should make a new OCRVision for each image. You can release it when you've gotten the text out of it.
-@interface OCRVisionComplete :NSObject
+/// When the  OCR is complete, it will pass your continuation block an object that responds to this protocol.
+@protocol OCRVisionComplete <NSObject>
 
 /// all the text on the page. nil if not available.
 @property(readonly) NSString *allText;
@@ -30,12 +27,13 @@ enum {
 @property(readonly, nullable) NSError *ocrError;
 
 /// Once an OCR operation completes, the individual lines of text.
-- (NSArray<VNRecognizedTextObservation *> *)textObservations API_AVAILABLE(macos(10.15));
+@property(readonly) NSArray<VNRecognizedTextObservation *> *textObservations;
 
 @end
 
 /// Wrap up the Vision OCR framework in a  simple API
-@interface OCRVision : NSObject
+API_AVAILABLE(macos(10.15))
+@interface OCRVision : NSObject<OCRVisionComplete>
 
 /// The list of languages the VisionFramework will accept. en_US is the default. Empty array means the VisionFramework is not available.
 @property(class, readonly) NSArray<NSString *> *ocrLanguages;
@@ -50,7 +48,7 @@ enum {
 ///
 /// @param image - the image to OCR
 /// @param completion - a block passed an object that corresponds to the OCRVision protocol.
-- (void)ocrImage:(NSImage *)image completion:(void (^)(OCRVisionComplete * _Nonnull ocrDone))completion;
+- (void)ocrImage:(NSImage *)image completion:(void (^)(id<OCRVisionComplete> _Nonnull ocrDone))completion;
 
 /// Run the ocr engine on the image in the default language. When it's done, call the completion passing an object that implements the OCRVisionComplete protocol
 ///
@@ -58,7 +56,7 @@ enum {
 ///
 /// @param cgImage - the image to OCR
 /// @param completion - a block passed an object that corresponds to the OCRVision protocol.
-- (void)ocrCGImage:(CGImageRef)cgImage completion:(void (^)(OCRVisionComplete * _Nonnull ocrDone))completion;
+- (void)ocrCGImage:(CGImageRef)cgImage completion:(void (^)(id<OCRVisionComplete> _Nonnull ocrDone))completion;
 
 @end
 

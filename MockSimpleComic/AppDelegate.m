@@ -6,20 +6,20 @@
 
 #import "AppDelegate.h"
 
-#import "OCRedTextView.h"
+#import "SimpleImagePageView.h"
 
 @interface AppDelegate ()
 
 @property IBOutlet NSWindow *window;
 @property IBOutlet NSScrollView *scroll;
 @property IBOutlet NSImageView *page;
-@property OCRedTextView *ocrView;
+@property SimpleImagePageView *ocrView;
 @end
 
 @implementation AppDelegate
 
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
-	self.ocrView = [[OCRedTextView alloc] initWithFrame:self.page.bounds];
+	self.ocrView = [[SimpleImagePageView alloc] initWithFrame:self.page.bounds];
 	self.ocrView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
 	[self.ocrView ocrImage:self.page.image];	// <- run the OCR engine and initialize the U.I.
 	[self.page addSubview:self.ocrView];

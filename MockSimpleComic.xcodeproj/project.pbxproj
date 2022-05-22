@@ -7,19 +7,21 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		6369E4EF2836F46500E7EBA8 /* OCRVision.m in Sources */ = {isa = PBXBuildFile; fileRef = 6369E4EE2836F46500E7EBA8 /* OCRVision.m */; };
+		63749DC32839B14B004E2B64 /* OCRVision.m in Sources */ = {isa = PBXBuildFile; fileRef = 63749DC22839B14B004E2B64 /* OCRVision.m */; };
+		63749DC62839B285004E2B64 /* SimpleImagePageView.m in Sources */ = {isa = PBXBuildFile; fileRef = 63749DC42839B285004E2B64 /* SimpleImagePageView.m */; };
 		63EE68532832ADA300FDA444 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 63EE68522832ADA300FDA444 /* AppDelegate.m */; };
 		63EE68552832ADA500FDA444 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 63EE68542832ADA500FDA444 /* Assets.xcassets */; };
 		63EE68582832ADA500FDA444 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 63EE68562832ADA500FDA444 /* MainMenu.xib */; };
 		63EE685A2832ADA500FDA444 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 63EE68592832ADA500FDA444 /* main.m */; };
 		63EE68622832ADD300FDA444 /* test.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 63EE68612832ADD300FDA444 /* test.jpg */; };
 		63EE68662832B67F00FDA444 /* Vision.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 63EE68652832B67F00FDA444 /* Vision.framework */; settings = {ATTRIBUTES = (Weak, ); }; };
-		63EE686C2832BF8D00FDA444 /* OCRedTextView.m in Sources */ = {isa = PBXBuildFile; fileRef = 63EE686B2832BF8D00FDA444 /* OCRedTextView.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		6369E4ED2836F46500E7EBA8 /* OCRVision.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OCRVision.h; sourceTree = "<group>"; };
-		6369E4EE2836F46500E7EBA8 /* OCRVision.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = OCRVision.m; sourceTree = "<group>"; };
+		63749DC12839B14B004E2B64 /* OCRVision.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OCRVision.h; sourceTree = "<group>"; };
+		63749DC22839B14B004E2B64 /* OCRVision.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = OCRVision.m; sourceTree = "<group>"; };
+		63749DC42839B285004E2B64 /* SimpleImagePageView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SimpleImagePageView.m; sourceTree = "<group>"; };
+		63749DC52839B285004E2B64 /* SimpleImagePageView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SimpleImagePageView.h; sourceTree = "<group>"; };
 		63EE684E2832ADA300FDA444 /* MockSimpleComic.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MockSimpleComic.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		63EE68512832ADA300FDA444 /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
 		63EE68522832ADA300FDA444 /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
@@ -29,8 +31,6 @@
 		63EE685B2832ADA500FDA444 /* MockSimpleComic.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MockSimpleComic.entitlements; sourceTree = "<group>"; };
 		63EE68612832ADD300FDA444 /* test.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = test.jpg; sourceTree = "<group>"; };
 		63EE68652832B67F00FDA444 /* Vision.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Vision.framework; path = System/Library/Frameworks/Vision.framework; sourceTree = SDKROOT; };
-		63EE686A2832BF8D00FDA444 /* OCRedTextView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OCRedTextView.h; sourceTree = "<group>"; };
-		63EE686B2832BF8D00FDA444 /* OCRedTextView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = OCRedTextView.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -45,6 +45,15 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		63749DC02839B14B004E2B64 /* OCRVision */ = {
+			isa = PBXGroup;
+			children = (
+				63749DC12839B14B004E2B64 /* OCRVision.h */,
+				63749DC22839B14B004E2B64 /* OCRVision.m */,
+			);
+			path = OCRVision;
+			sourceTree = "<group>";
+		};
 		63EE68452832ADA300FDA444 = {
 			isa = PBXGroup;
 			children = (
@@ -67,10 +76,9 @@
 			children = (
 				63EE68512832ADA300FDA444 /* AppDelegate.h */,
 				63EE68522832ADA300FDA444 /* AppDelegate.m */,
-				63EE686A2832BF8D00FDA444 /* OCRedTextView.h */,
-				63EE686B2832BF8D00FDA444 /* OCRedTextView.m */,
-				6369E4ED2836F46500E7EBA8 /* OCRVision.h */,
-				6369E4EE2836F46500E7EBA8 /* OCRVision.m */,
+				63749DC52839B285004E2B64 /* SimpleImagePageView.h */,
+				63749DC42839B285004E2B64 /* SimpleImagePageView.m */,
+				63749DC02839B14B004E2B64 /* OCRVision */,
 				63EE68542832ADA500FDA444 /* Assets.xcassets */,
 				63EE68612832ADD300FDA444 /* test.jpg */,
 				63EE68562832ADA500FDA444 /* MainMenu.xib */,
@@ -158,9 +166,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				63EE686C2832BF8D00FDA444 /* OCRedTextView.m in Sources */,
 				63EE685A2832ADA500FDA444 /* main.m in Sources */,
-				6369E4EF2836F46500E7EBA8 /* OCRVision.m in Sources */,
+				63749DC62839B285004E2B64 /* SimpleImagePageView.m in Sources */,
+				63749DC32839B14B004E2B64 /* OCRVision.m in Sources */,
 				63EE68532832ADA300FDA444 /* AppDelegate.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

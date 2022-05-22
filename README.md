@@ -15,8 +15,12 @@ OCRing.
 
 This app creates a VNRecognizeTextRequest to recognize all the text in an image. That's all you need
 to select individual lines of text in the image, or if you just need the text to
-index it for Spotlight. If you want to mouse select not lines, but individual words, use a
-VNDetectTextRectanglesRequest.
+index it for Spotlight.
+
+Selecting individual words is a work in progress. The selection is represented by a dictionary
+where the key is a VNRecognizeTextRequest and the value is the range of the string that was
+selected. For now, although ranges of lines can be _drawn_ selected the mouse tracking still
+sets the range to the whole string.
 
 On the menubar, Select All, Copy, and Start Speaking work, as do items on the Services submenu.
 

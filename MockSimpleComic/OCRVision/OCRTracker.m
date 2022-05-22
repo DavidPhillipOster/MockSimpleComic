@@ -9,9 +9,9 @@
 #import "OCRVision.h"
 #import <Vision/Vision.h>
 
-/// @return the quadrilateral of the text observation as a NSBezierPath/
+/// @return the quadrilateral of the rect observation as a NSBezierPath/
 API_AVAILABLE(macos(10.15))
-static NSBezierPath *BezierPathFromTextObservation(VNRecognizedTextObservation *piece)
+static NSBezierPath *BezierPathFromRectObservation(VNRectangleObservation *piece)
 {
 	NSBezierPath *path = [NSBezierPath bezierPath];
 	[path moveToPoint:piece.topLeft];
@@ -21,6 +21,19 @@ static NSBezierPath *BezierPathFromTextObservation(VNRecognizedTextObservation *
 	[path closePath];
 	return path;
 }
+
+/// @param piece - the TextObservation
+/// @param r - the range of the string of the TextObservation
+/// @return the quadrilateral of the text observation as a NSBezierPath/
+API_AVAILABLE(macos(10.15))
+static NSBezierPath *BezierPathFromTextObservationRange(VNRecognizedTextObservation *piece, NSRange r)
+{
+	VNRecognizedText *recognizedText = [[piece topCandidates:1] firstObject];
+	// VNRectangleObservation is a superclass of VNRecognizedTextObservation. On error, use the whole thing.
+	VNRectangleObservation *rect = [recognizedText boundingBoxForRange:r error:NULL] ?: piece;
+	return BezierPathFromRectObservation(rect);
+}
+
 
 /// @return the NSRect from two points.
 static NSRect RectFrom2Points(NSPoint a, NSPoint b)
@@ -47,8 +60,8 @@ typedef enum OCRDragEnum {
 /// <VNRecognizedTextObservation *> - 10.15 and newer
 @property NSArray *textPieces;
 
-/// <VNRecognizedTextObservation *> - 10.15 and newer
-@property NSMutableSet *selectionPieces;
+/// <VNRecognizedTextObservation *, valueWithRange> - 10.15 and newer
+@property NSMutableDictionary<NSObject *, NSValue *> *selectionPieces;
 
 @end
 
@@ -70,7 +83,7 @@ typedef enum OCRDragEnum {
 
 - (void)initOCRedTextView
 {
-	self.selectionPieces = [NSMutableSet set];
+	self.selectionPieces = [NSMutableDictionary dictionary];
 }
 
 - (BOOL)acceptsFirstResponder
@@ -93,9 +106,10 @@ typedef enum OCRDragEnum {
 			[transform scaleXBy:self.bounds.size.width yBy:self.bounds.size.height];
 			for (VNRecognizedTextObservation *piece in self.textPieces)
 			{
-				if ([self.selectionPieces containsObject:piece])
+				NSValue *rangeValue = self.selectionPieces[piece];
+				if (rangeValue != nil)
 				{
-					NSBezierPath *path = BezierPathFromTextObservation(piece);
+					NSBezierPath *path = BezierPathFromTextObservationRange(piece, rangeValue.rangeValue);
 					[path transformUsingAffineTransform:transform];
 					[[NSColor.yellowColor colorWithAlphaComponent:0.4] set];
 					[path fill];
@@ -129,7 +143,8 @@ typedef enum OCRDragEnum {
 	{
 		for (VNRecognizedTextObservation *piece in self.textPieces)
 		{
-			if ([self.selectionPieces containsObject:piece])
+			NSValue *rangeValue = self.selectionPieces[piece];
+			if (rangeValue != nil)
 			{
 				NSArray<VNRecognizedText *> *text1 = [piece topCandidates:1];
 				[a addObject:text1.firstObject.string];
@@ -185,12 +200,17 @@ typedef enum OCRDragEnum {
 
 #pragma mark OCR
 
-- (void)ocrDidFinish:(OCRVisionComplete *)complete
+- (void)ocrDidFinish:(id<OCRVisionComplete>)complete
 {
+	NSArray *textPieces = @[];
+	if (@available(macOS 10.15, *)) {
+		textPieces = complete.textObservations;
+	}
+	// Since we are changing state that affects the U.I., we do it on the main thread in the future,
+	// but `complete` isn't guaranteed to exist then, so we assign to locals so it will be captured
+	// by the block.
 	dispatch_async(dispatch_get_main_queue(), ^{
-		if (@available(macOS 10.15, *)) {
-			self.textPieces = complete.textObservations;
-		}
+		self.textPieces = textPieces;
 		[self.selectionPieces removeAllObjects];
 		[self setNeedsDisplay:YES];
 		[self.window invalidateCursorRectsForView:self];
@@ -199,20 +219,28 @@ typedef enum OCRDragEnum {
 
 - (void)ocrImage:(NSImage *)image
 {
-	__block OCRVision *ocrVision = [[OCRVision alloc] init];
-	[ocrVision ocrImage:image completion:^(OCRVisionComplete * _Nonnull complete) {
-		[self ocrDidFinish:complete];
-		ocrVision = nil;
-	}];
+	if (@available(macOS 10.15, *)) {
+		__block OCRVision *ocrVision = [[OCRVision alloc] init];
+		dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+			[ocrVision ocrImage:image completion:^(id<OCRVisionComplete> _Nonnull complete) {
+				[self ocrDidFinish:complete];
+				ocrVision = nil;
+			}];
+		});
+	}
 }
 
 - (void)ocrCGImage:(CGImageRef)cgImage
 {
-	__block OCRVision *ocrVision = [[OCRVision alloc] init];
-	[ocrVision ocrCGImage:cgImage completion:^(OCRVisionComplete * _Nonnull complete) {
-		[self ocrDidFinish:complete];
-		ocrVision = nil;
-	}];
+	if (@available(macOS 10.15, *)) {
+		__block OCRVision *ocrVision = [[OCRVision alloc] init];
+		dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+			[ocrVision ocrCGImage:cgImage completion:^(id<OCRVisionComplete> _Nonnull complete) {
+				[self ocrDidFinish:complete];
+				ocrVision = nil;
+			}];
+		});
+	}
 }
 
 
@@ -233,7 +261,8 @@ typedef enum OCRDragEnum {
 
 - (void)mouseDownText:(NSEvent *)theEvent textPiece:(NSObject *)textPiece
 {
-	if ([self.selectionPieces containsObject:textPiece]  && (theEvent.modifierFlags & NSEventModifierFlagControl) != 0) {
+	NSValue *rangeValue = self.selectionPieces[textPiece];
+	if (rangeValue != nil && (theEvent.modifierFlags & NSEventModifierFlagControl) != 0) {
 		NSMenu *theMenu = [[NSMenu alloc] initWithTitle:@"Contextual Menu"];
 		[theMenu insertItemWithTitle:@"Copy" action:@selector(copy:) keyEquivalent:@"" atIndex:0];
 		[theMenu insertItem:[NSMenuItem separatorItem] atIndex:1];
@@ -299,13 +328,13 @@ typedef enum OCRDragEnum {
 {
 	NSPoint startPoint = [self convertPoint:[theEvent locationInWindow] fromView:nil];
 	self.dragKind = OCRDragEnumIBeam;
-	NSMutableSet *previousSelection = [NSMutableSet set];
+	NSMutableDictionary *previousSelection = [NSMutableDictionary dictionary];
 	if (theEvent.modifierFlags & NSEventModifierFlagCommand)
 	{
 		previousSelection = [self.selectionPieces mutableCopy];
 	}
 	[self.selectionPieces removeAllObjects];
-	[self.selectionPieces addObjectsFromArray:[previousSelection allObjects]];
+	[self.selectionPieces addEntriesFromDictionary:previousSelection];
 	while ([theEvent type] != NSEventTypeLeftMouseUp)
 	{
 		if ([theEvent type] == NSEventTypeLeftMouseDragged)
@@ -320,20 +349,34 @@ typedef enum OCRDragEnum {
 	self.dragKind = OCRDragEnumNot;
 }
 
-- (void)updateSelectionFromDownRect:(NSRect)downRect previousSelection:(NSMutableSet *)previousSelection
+- (void)updateSelectionFromDownRect:(NSRect)downRect previousSelection:(NSMutableDictionary *)previousSelection
 {
 	if (@available(macOS 10.15, *))
 	{
-		NSMutableSet *selectionSet = [NSMutableSet set];
+		NSMutableDictionary *selectionSet = [NSMutableDictionary dictionary];
 		for (VNRecognizedTextObservation *piece in self.textPieces)
 		{
 			CGRect pieceR = [self boundBoxOfPiece:piece];
 			if (CGRectIntersectsRect(downRect, pieceR)) {
-				[selectionSet addObject:piece];
-				[previousSelection removeObject:piece];
+				VNRecognizedText *text1 = [[piece topCandidates:1] firstObject];
+				NSString *s = text1.string;
+				NSMutableArray<NSString *> *a = [[s componentsSeparatedByString:@" "] mutableCopy];
+				NSInteger start = 0;
+				NSInteger length = s.length;
+#if 1	// experiment: Prove I can hilite a word at a time by not hiliting the first and last word.
+				if (3 < a.count) {
+					start = a.firstObject.length + 1;
+					[a removeObjectAtIndex:0];
+					[a removeLastObject];
+					length = [[a componentsJoinedByString:@" "] length];
+				}
+#endif
+				NSRange r = NSMakeRange(start, length);
+				selectionSet[piece] = [NSValue valueWithRange:r];
+				previousSelection[piece] = nil;
 			}
 		}
-		[selectionSet addObjectsFromArray:[previousSelection allObjects]];
+		[selectionSet addEntriesFromDictionary:previousSelection];
 		if (![self.selectionPieces isEqual:selectionSet]) {
 			self.selectionPieces = selectionSet;
 			[self setNeedsDisplay:YES];
@@ -449,7 +492,9 @@ typedef enum OCRDragEnum {
 	{
 		for (VNRecognizedTextObservation *piece in self.textPieces)
 		{
-			[self.selectionPieces addObject:piece];
+			NSArray<VNRecognizedText *> *text1 = [piece topCandidates:1];
+			NSRange r = NSMakeRange(0, text1.firstObject.string.length);
+			self.selectionPieces[piece] = [NSValue valueWithRange:r];
 		}
 		[self setNeedsDisplay:YES];
 		[self.window invalidateCursorRectsForView:self];
