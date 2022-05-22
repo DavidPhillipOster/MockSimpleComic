@@ -1,7 +1,7 @@
 //  OCRTracker.m
 //  MockSimpleComic
 //
-//  Created by David Phillip Oster on 5/21/2022
+//  Created by David Phillip Oster on 5/21/2022 Apache Version 2 open source license.
 //
 
 #import "OCRTracker.h"

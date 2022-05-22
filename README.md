@@ -27,7 +27,17 @@ On the menubar, Select All, Copy, and Start Speaking work, as do items on the Se
 Control-Click on selected text for a contextual menu. (Simple Comic uses right click for its
 magnifying glass.)
 
-Example of the start of the text it found with this sample page.
+### Classes
+
+SimpleImagePageView - the toy model of a TSSTPageView: an NSImageView in scrollbars
+
+OCRVision/OCRTracker - provides mouse tracking and selection drawing for the SimpleImagePageView
+
+OCRVision/OCRVision - proves a simple interface for actually performing the OCR
+
+### Example
+
+Example of the start of the text the Vision framework found with this sample page.
 
 ![sample](images/sample.png)
 
@@ -41,3 +51,7 @@ WHICH SEEMS -SNIFF& MOST
 APPROPRIATE FOR THEIR
 CURRENT FETTLE/ …
 ```
+### License
+
+Open source under the Apache License Version 2 license. If you wish to use this under a
+different license, plese get in touch with me.
