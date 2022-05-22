@@ -38,12 +38,7 @@ static NSBezierPath *BezierPathFromTextObservationRange(VNRecognizedTextObservat
 /// @return the NSRect from two points.
 static NSRect RectFrom2Points(NSPoint a, NSPoint b)
 {
-	NSRect r;
-	r.origin = a;
-	r.size.width = b.x - a.x;
-	r.size.height = b.y - a.y;
-	r = CGRectStandardize(r);
-	return r;
+	return CGRectStandardize(NSMakeRect(a.x, a.y, b.x - a.x, b.y - a.y));
 }
 
 /// @return the set of indices into a string such that s[index] is at the near the beginning or end of a whitespace delimited 'word'
