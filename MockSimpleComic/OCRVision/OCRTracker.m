@@ -55,12 +55,18 @@ static NSIndexSet *WordsBoundariesOfString(NSString *s)
 	return indicies;
 }
 
+/// Given two ranges in order, early before late
+/// @return a continguous range that spans from early to late.
+static NSRange UnionRanges(NSRange early, NSRange late)
+{
+	return NSMakeRange(early.location, late.length+late.location - early.location);
+}
+
 
 static NSSpeechSynthesizer *sSpeechSynthesizer;
 
 typedef enum OCRDragEnum {
 	OCRDragEnumNot,
-	OCRDragEnumHand,
 	OCRDragEnumIBeam
 } OCRDragEnum;
 
@@ -222,6 +228,13 @@ typedef enum OCRDragEnum {
 /// @return The bound box in View coordinates
 - (CGRect)boundBoxOfPiece:(VNRecognizedTextObservation *)piece range:(NSRange)charRange API_AVAILABLE(macos(10.15))
 {
+	VNRecognizedText *text1 = [[piece topCandidates:1] firstObject];
+	NSString *s1 = text1.string;
+	if (s1.length < charRange.location + charRange.length)
+	{
+		return CGRectNull;
+	}
+
 	NSAffineTransform *transform = [NSAffineTransform transform];
 	[transform scaleXBy:self.view.bounds.size.width yBy:self.view.bounds.size.height];
 	NSBezierPath *path = BezierPathFromTextObservationRange(piece, charRange);
@@ -376,45 +389,76 @@ typedef enum OCRDragEnum {
 	}
 }
 
+// if the start and end indices delimit a range that intersects r, return the range, else the NotFound range.
+//
+// @param piece - the VNRecognizedTextObservation to examine
+// @param r - The rectangle to intersect against
+// @param start - the start index into the string of the text of the piece
+// @param end - the end index into the string of the text of the piece
+// @return the range of the word of the piece that downRect intersects, else the NotFound range.
+- (NSRange)rangeOfPiece:(VNRecognizedTextObservation *)piece intersectsRect:(NSRect)r start:(NSUInteger)start end:(NSUInteger)end  API_AVAILABLE(macos(10.15))
+{
+	if (0 < end - start)	// ignore zero length ranges.
+	{
+		NSRange wordRange = NSMakeRange(start, end - start);
+		CGRect wordR = [self boundBoxOfPiece:piece range:wordRange];
+		if (CGRectIntersectsRect(r, wordR))
+		{
+			return wordRange;
+		}
+	}
+	return NSMakeRange(NSNotFound, 0);
+}
+
+// @return the first range of the word of the piece that downRect intersects, else the NotFound range.
+- (NSRange)firstRangeOfPiece:(VNRecognizedTextObservation *)piece intersectsRect:(NSRect)downRect indexSet:(NSIndexSet *)wordStarts  API_AVAILABLE(macos(10.15))
+{
+	NSUInteger endIndex = [wordStarts indexGreaterThanIndex:0];
+	NSUInteger startIndex = 0;
+	for (;endIndex != NSNotFound; endIndex = [wordStarts indexGreaterThanIndex:endIndex])
+	{
+		NSRange wordRange = [self rangeOfPiece:piece intersectsRect:downRect start:startIndex end:endIndex];
+		if (wordRange.location != NSNotFound)
+		{
+			return wordRange;
+		}
+		startIndex = endIndex;
+	}
+	return NSMakeRange(NSNotFound, 0);
+}
+
+/// @return the last range of the word of the piece that downRect intersects, else the NotFound range.
+- (NSRange)lastRangeOfPiece:(VNRecognizedTextObservation *)piece intersectsRect:(NSRect)downRect indexSet:(NSIndexSet *)wordStarts  API_AVAILABLE(macos(10.15))
+{
+	NSUInteger endIndex = [wordStarts lastIndex];
+	NSUInteger startIndex = [wordStarts indexLessThanIndex:endIndex];
+	for (;startIndex != NSNotFound; startIndex = [wordStarts indexLessThanIndex:startIndex])
+	{
+		NSRange wordRange = [self rangeOfPiece:piece intersectsRect:downRect start:startIndex end:endIndex];
+		if (wordRange.location != NSNotFound)
+		{
+			return wordRange;
+		}
+		endIndex = startIndex;
+	}
+	return NSMakeRange(0, NSNotFound);
+}
+
+/// @return the range of all of the words of the text of the piece that downRect intersects.
 - (NSRange)rangeOfPiece:(VNRecognizedTextObservation *)piece intersectsRect:(NSRect)downRect API_AVAILABLE(macos(10.15))
 {
 	VNRecognizedText *text1 = [[piece topCandidates:1] firstObject];
 	NSString *s = text1.string;
 	NSIndexSet *wordStarts = WordsBoundariesOfString(s);
-	NSInteger start = 0;
-	NSInteger end = s.length;
-	NSInteger i = [wordStarts indexGreaterThanIndex:0];
-	NSInteger iAnchor = wordStarts.lastIndex;
-	NSInteger iPrevious = 0;
-	for (; i<iAnchor; i = [wordStarts indexGreaterThanIndex:i])
+
+	NSRange first = [self firstRangeOfPiece:piece intersectsRect:downRect indexSet:wordStarts];
+	NSRange last = [self lastRangeOfPiece:piece intersectsRect:downRect indexSet:wordStarts];
+	if (first.location == NSNotFound || last.location == NSNotFound)
 	{
-		NSRange wordRange = NSMakeRange(iPrevious, i - iPrevious);
-		CGRect wordR = [self boundBoxOfPiece:piece range:wordRange];
-		if (CGRectIntersectsRect(downRect, wordR))
-		{
-			start = iPrevious;
-			break;
-		}
-		iPrevious = i;
+		return NSMakeRange(0, s.length);
 	}
-	iPrevious = s.length;
-	i = [wordStarts indexLessThanIndex:iPrevious];
-	iAnchor = wordStarts.firstIndex;
-	for (;iAnchor <= i; i = [wordStarts indexLessThanIndex:i])
-	{
-		NSRange wordRange = NSMakeRange(i, iPrevious - i);
-		CGRect wordR = [self boundBoxOfPiece:piece range:wordRange];
-		if (CGRectIntersectsRect(downRect, wordR))
-		{
-			end = iPrevious;
-			break;
-		}
-		iPrevious = i;
-	}
-	return NSMakeRange(start, end - start);
+	return UnionRanges(first, last);
 }
-
-
 
 - (BOOL)didResetCursorRects
 {
