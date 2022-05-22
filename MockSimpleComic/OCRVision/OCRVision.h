@@ -20,7 +20,7 @@ enum {
 /// When the  OCR is complete, it will pass your continuation block an object that responds to this protocol.
 @protocol OCRVisionComplete <NSObject>
 
-/// all the text on the page. nil if not available.
+/// all the text on the page.
 @property(readonly) NSString *allText;
 
 /// non-nil if an error occurred OCR'ing the image.
