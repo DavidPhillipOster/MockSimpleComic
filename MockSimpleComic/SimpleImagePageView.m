@@ -5,15 +5,11 @@
 
 #import "SimpleImagePageView.h"
 
-#import "OCRVision.h"
-
-typedef enum DragEnum {
-	DragEnumNot,
-	DragEnumHand
-} DragEnum;
+#import "OCRTracker.h"
 
 @interface SimpleImagePageView()
-@property DragEnum dragKind;
+@property BOOL isInDrag;
+@property OCRTracker *tracker;
 @end
 
 @implementation SimpleImagePageView
@@ -34,21 +30,40 @@ typedef enum DragEnum {
 
 - (void)initSimpleImagePageView
 {
+	_tracker = [[OCRTracker alloc] initWithView:self];
 }
+
+- (BOOL)acceptsFirstResponder
+{
+  return YES;
+}
+
+- (BOOL)becomeFirstResponder {
+	[self.tracker becomeNextResponder];
+  return YES;
+}
+
+- (BOOL)resignFirstResponder {
+  return YES;
+}
+
 
 - (void)drawRect:(NSRect)dirtyRect
 {
 	[super drawRect:dirtyRect];
+	[self.tracker drawRect:dirtyRect];
 }
 
 #pragma mark OCR
 
 - (void)ocrImage:(NSImage *)image
 {
+	[self.tracker ocrImage:image];
 }
 
 - (void)ocrCGImage:(CGImageRef)cgImage
 {
+	[self.tracker ocrCGImage:cgImage];
 }
 
 
@@ -56,6 +71,10 @@ typedef enum DragEnum {
 
 - (void)mouseDown:(NSEvent *)theEvent
 {
+	if ([self.tracker didMouseDown:theEvent])
+	{
+		return;
+	}
 	if([self dragIsPossible])
 	{
 		[self mouseDownHand];
@@ -75,6 +94,10 @@ typedef enum DragEnum {
 
 - (void)mouseDragged:(NSEvent *)theEvent
 {
+	if ([self.tracker didMouseDragged:theEvent])
+	{
+		return;
+	}
 	if([self dragIsPossible])
 	{
 		[self mouseDraggedHand:theEvent];
@@ -86,7 +109,7 @@ typedef enum DragEnum {
 	NSPoint viewOrigin = [[self enclosingScrollView] documentVisibleRect].origin;
 	NSPoint cursor = [theEvent locationInWindow];
 	NSPoint currentPoint;
-	self.dragKind = DragEnumHand;
+	self.isInDrag = YES;
 	while ([theEvent type] != NSEventTypeLeftMouseUp)
 	{
 		if ([theEvent type] == NSEventTypeLeftMouseDragged)
@@ -97,7 +120,7 @@ typedef enum DragEnum {
 		}
 		theEvent = [[self window] nextEventMatchingMask: NSEventMaskLeftMouseUp | NSEventMaskLeftMouseDragged];
 	}
-	self.dragKind = DragEnumNot;
+	self.isInDrag = NO;
 	[[self window] invalidateCursorRectsForView: self];
 }
 
@@ -131,9 +154,13 @@ typedef enum DragEnum {
 
 - (void)resetCursorRects
 {
+	if ([self.tracker didResetCursorRects])
+	{
+		return;
+	}
 	if([self dragIsPossible])
 	{
-		NSCursor *cursor = self.dragKind == DragEnumHand ? [NSCursor closedHandCursor] : [NSCursor openHandCursor];
+		NSCursor *cursor = self.isInDrag ? [NSCursor closedHandCursor] : [NSCursor openHandCursor];
 		[self addCursorRect: [[self enclosingScrollView] documentVisibleRect] cursor:cursor];
 	}
 //	else if(canCrop)

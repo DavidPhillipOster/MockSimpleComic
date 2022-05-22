@@ -1,10 +1,10 @@
-//  OCRedTextView.m
+//  OCRTracker.m
 //  MockSimpleComic
 //
-//  Created by David Phillip Oster on 5/16/22.
+//  Created by David Phillip Oster on 5/21/2022
 //
 
-#import "OCRedTextView.h"
+#import "OCRTracker.h"
 
 #import "OCRVision.h"
 #import <Vision/Vision.h>
@@ -54,7 +54,7 @@ typedef enum OCRDragEnum {
 	OCRDragEnumIBeam
 } OCRDragEnum;
 
-@interface OCRedTextView()
+@interface OCRTracker()
 @property OCRDragEnum dragKind;
 
 /// <VNRecognizedTextObservation *> - 10.15 and newer
@@ -63,27 +63,28 @@ typedef enum OCRDragEnum {
 /// <VNRecognizedTextObservation *, valueWithRange> - 10.15 and newer
 @property NSMutableDictionary<NSObject *, NSValue *> *selectionPieces;
 
+@property (weak, nullable) NSView *view;
+
 @end
 
-@implementation OCRedTextView
+@implementation OCRTracker
 
-- (instancetype)initWithCoder:(NSCoder *)coder
+- (instancetype)initWithView:(NSView *)view
 {
-	self = [super initWithCoder:coder];
-	[self initOCRedTextView];
+	self = [super init];
+	if (self)
+	{
+		_view = view;
+	}
 	return self;
 }
 
-- (instancetype)initWithFrame:(NSRect)frameRect
-{
-	self = [super initWithFrame:frameRect];
-	[self initOCRedTextView];
-	return self;
-}
-
-- (void)initOCRedTextView
-{
-	self.selectionPieces = [NSMutableDictionary dictionary];
+- (void)becomeNextResponder {
+	if (self.view.nextResponder != self)
+	{
+		self.nextResponder = self.view.nextResponder;
+		self.view.nextResponder = self;
+	}
 }
 
 - (BOOL)acceptsFirstResponder
@@ -93,17 +94,17 @@ typedef enum OCRDragEnum {
 
 - (void)drawRect:(NSRect)dirtyRect
 {
-	[super drawRect:dirtyRect];
 	if (self.textPieces == nil)
 	{
+		// temporary, to show we haven't run the OCR yet.
 		[[NSColor.yellowColor colorWithAlphaComponent:0.4] set];
-		CGRect smallBounds = CGRectInset(self.bounds, 20, 20);
+		CGRect smallBounds = CGRectInset(self.view.bounds, 20, 20);
 		NSRectFill(smallBounds);
 	} else {
 		if (@available(macOS 10.15, *))
 		{
 			NSAffineTransform *transform = [NSAffineTransform transform];
-			[transform scaleXBy:self.bounds.size.width yBy:self.bounds.size.height];
+			[transform scaleXBy:self.view.bounds.size.width yBy:self.view.bounds.size.height];
 			for (VNRecognizedTextObservation *piece in self.textPieces)
 			{
 				NSValue *rangeValue = self.selectionPieces[piece];
@@ -156,7 +157,7 @@ typedef enum OCRDragEnum {
 
 - (nullable NSObject *)textPieceForMouseEvent:(NSEvent *)theEvent
 {
-	NSPoint where = [self convertPoint:[theEvent locationInWindow] fromView:nil];
+	NSPoint where = [self.view convertPoint:[theEvent locationInWindow] fromView:nil];
 	return [self textPieceForPoint:where];
 }
 
@@ -170,7 +171,7 @@ typedef enum OCRDragEnum {
 	{
 		if (self.textPieces)
 		{
-			CGRect container = [[self enclosingScrollView] documentVisibleRect];
+			CGRect container = [[[self view] enclosingScrollView] documentVisibleRect];
 			for (VNRecognizedTextObservation *piece in self.textPieces)
 			{
 				CGRect r = [self boundBoxOfPiece:piece];
@@ -191,7 +192,7 @@ typedef enum OCRDragEnum {
 - (CGRect)boundBoxOfPiece:(VNRecognizedTextObservation *)piece API_AVAILABLE(macos(10.15))
 {
 	NSAffineTransform *transform = [NSAffineTransform transform];
-	[transform scaleXBy:self.bounds.size.width yBy:self.bounds.size.height];
+	[transform scaleXBy:self.view.bounds.size.width yBy:self.view.bounds.size.height];
 	CGRect r = piece.boundingBox;
 	r.origin = [transform transformPoint:r.origin];
 	r.size = [transform transformSize:r.size];
@@ -212,8 +213,8 @@ typedef enum OCRDragEnum {
 	dispatch_async(dispatch_get_main_queue(), ^{
 		self.textPieces = textPieces;
 		[self.selectionPieces removeAllObjects];
-		[self setNeedsDisplay:YES];
-		[self.window invalidateCursorRectsForView:self];
+		[self.view setNeedsDisplay:YES];
+		[self.view.window invalidateCursorRectsForView:self.view];
 	});
 }
 
@@ -246,17 +247,21 @@ typedef enum OCRDragEnum {
 
 #pragma mark Mouse
 
-- (void)mouseDown:(NSEvent *)theEvent
+- (BOOL)didMouseDown:(NSEvent *)theEvent
 {
 	NSObject *textPiece = [self textPieceForMouseEvent:theEvent];
-	if (textPiece != nil)
+	BOOL isDoingMouseDown = (textPiece != nil);
+	if (isDoingMouseDown)
 	{
 		[self mouseDownText:theEvent textPiece:textPiece];
 	}
-	else if([self dragIsPossible])
+	else if (!(theEvent.modifierFlags & NSEventModifierFlagCommand) && self.selectionPieces.count != 0)
 	{
-		[self mouseDownHand];
+		// click not in text selection. Clear the selection.
+		[self.selectionPieces removeAllObjects];
+		[self.view setNeedsDisplay:YES];
 	}
+	return isDoingMouseDown;
 }
 
 - (void)mouseDownText:(NSEvent *)theEvent textPiece:(NSObject *)textPiece
@@ -268,65 +273,31 @@ typedef enum OCRDragEnum {
 		[theMenu insertItem:[NSMenuItem separatorItem] atIndex:1];
 		[theMenu insertItemWithTitle:@"Start Speaking" action:@selector(startSpeaking:) keyEquivalent:@"" atIndex:2];
 		[theMenu insertItemWithTitle:@"Stop Speaking" action:@selector(stopSpeaking:) keyEquivalent:@"" atIndex:3];
-		[NSMenu popUpContextMenu:theMenu withEvent:theEvent forView:self];
+		[NSMenu popUpContextMenu:theMenu withEvent:theEvent forView:self.view];
 	} else {
 		[[NSCursor IBeamCursor] set];
 		if (!(theEvent.modifierFlags & NSEventModifierFlagCommand))
 		{
 			[self.selectionPieces removeAllObjects];
-			[self setNeedsDisplay:YES];
+			[self.view setNeedsDisplay:YES];
 		}
 	}
 }
 
-- (void)mouseDownHand
-{
-	[[NSCursor closedHandCursor] set];
-	[self.selectionPieces removeAllObjects];
-	[self setNeedsDisplay:YES];
-}
-
-- (void)mouseMoved:(NSEvent *)theEvent
-{
-	[super mouseMoved:theEvent];
-}
-
-- (void)mouseDragged:(NSEvent *)theEvent
+- (BOOL)didMouseDragged:(NSEvent *)theEvent
 {
 	NSObject *textPiece = [self textPieceForMouseEvent:theEvent];
-	if (textPiece != nil)
+	BOOL isDoingMouseDragged = (textPiece != nil);
+	if (isDoingMouseDragged)
 	{
 		[self mouseDragText:theEvent textPiece:textPiece];
 	}
-	else if([self dragIsPossible])
-	{
-		[self mouseDraggedHand:theEvent];
-	}
-}
-
-- (void)mouseDraggedHand:(NSEvent *)theEvent
-{
-	NSPoint viewOrigin = [[self enclosingScrollView] documentVisibleRect].origin;
-	NSPoint cursor = [theEvent locationInWindow];
-	NSPoint currentPoint;
-	self.dragKind = OCRDragEnumHand;
-	while ([theEvent type] != NSEventTypeLeftMouseUp)
-	{
-		if ([theEvent type] == NSEventTypeLeftMouseDragged)
-		{
-			currentPoint = [theEvent locationInWindow];
-			[self scrollPoint: NSMakePoint(viewOrigin.x + cursor.x - currentPoint.x,viewOrigin.y + cursor.y - currentPoint.y)];
-//				[sessionController refreshLoupePanel];
-		}
-		theEvent = [[self window] nextEventMatchingMask: NSEventMaskLeftMouseUp | NSEventMaskLeftMouseDragged];
-	}
-	self.dragKind = OCRDragEnumNot;
-	[[self window] invalidateCursorRectsForView: self];
+	return isDoingMouseDragged;
 }
 
 - (void)mouseDragText:(NSEvent *)theEvent textPiece:(NSObject *)textPiece
 {
-	NSPoint startPoint = [self convertPoint:[theEvent locationInWindow] fromView:nil];
+	NSPoint startPoint = [self.view convertPoint:[theEvent locationInWindow] fromView:nil];
 	self.dragKind = OCRDragEnumIBeam;
 	NSMutableDictionary *previousSelection = [NSMutableDictionary dictionary];
 	if (theEvent.modifierFlags & NSEventModifierFlagCommand)
@@ -339,13 +310,13 @@ typedef enum OCRDragEnum {
 	{
 		if ([theEvent type] == NSEventTypeLeftMouseDragged)
 		{
-			NSPoint endPoint = [self convertPoint:[theEvent locationInWindow] fromView:nil];
+			NSPoint endPoint = [self.view convertPoint:[theEvent locationInWindow] fromView:nil];
 			NSRect downRect = RectFrom2Points(startPoint, endPoint);
 			[self updateSelectionFromDownRect:downRect previousSelection:previousSelection];
 		}
-		theEvent = [[self window] nextEventMatchingMask: NSEventMaskLeftMouseUp | NSEventMaskLeftMouseDragged];
+		theEvent = [[self.view window] nextEventMatchingMask: NSEventMaskLeftMouseUp | NSEventMaskLeftMouseDragged];
 	}
-	[self.window invalidateCursorRectsForView:self];
+	[self.view.window invalidateCursorRectsForView:self.view];
 	self.dragKind = OCRDragEnumNot;
 }
 
@@ -379,73 +350,34 @@ typedef enum OCRDragEnum {
 		[selectionSet addEntriesFromDictionary:previousSelection];
 		if (![self.selectionPieces isEqual:selectionSet]) {
 			self.selectionPieces = selectionSet;
-			[self setNeedsDisplay:YES];
-			[self.window invalidateCursorRectsForView:self];
+			[self.view setNeedsDisplay:YES];
+			[self.view.window invalidateCursorRectsForView:self.view];
 		}
 	}
 }
 
-- (void)mouseUp:(NSEvent *)theEvent
-{
-	if([self dragIsPossible])
-	{
-		[[NSCursor openHandCursor] set];
-	}
-}
-
-- (BOOL)horizontalScrollIsPossible
-{
-	NSSize total = self.bounds.size;
-	NSSize visible = [[self enclosingScrollView] documentVisibleRect].size;
-	return (visible.width < round(total.width));
-}
-
-
-- (BOOL)verticalScrollIsPossible
-{
-	NSSize total = self.bounds.size;
-	NSSize visible = [[self enclosingScrollView] documentVisibleRect].size;
-	return (visible.height < round(total.height));
-}
-
-- (BOOL)dragIsPossible
-{
-	return [self horizontalScrollIsPossible] || [self verticalScrollIsPossible];
-}
-
-- (void)resetCursorRects
+- (BOOL)didResetCursorRects
 {
 	if (self.dragKind == OCRDragEnumIBeam) {
-		[self addCursorRect: [[self enclosingScrollView] documentVisibleRect] cursor:[NSCursor IBeamCursor]];
+		[self.view addCursorRect: [[[self view] enclosingScrollView] documentVisibleRect] cursor:[NSCursor IBeamCursor]];
+		return YES;
 	}
 	else if (@available(macOS 10.15, *))
 	{
 		if (self.textPieces)
 		{
-			CGRect container = [[self enclosingScrollView] documentVisibleRect];
+			CGRect container = [[[self view] enclosingScrollView] documentVisibleRect];
 			for (VNRecognizedTextObservation *piece in self.textPieces)
 			{
 				CGRect r = [self boundBoxOfPiece:piece];
 				r = CGRectIntersection(r, container);
 				if (!CGRectIsEmpty(r)) {
-					[self addCursorRect:r cursor:[NSCursor IBeamCursor]];
+					[self.view addCursorRect:r cursor:[NSCursor IBeamCursor]];
 				}
 			}
 		}
 	}
-	if([self dragIsPossible])
-	{
-		NSCursor *cursor = self.dragKind == OCRDragEnumHand ? [NSCursor closedHandCursor] : [NSCursor openHandCursor];
-		[self addCursorRect: [[self enclosingScrollView] documentVisibleRect] cursor:cursor];
-	}
-//	else if(canCrop)
-//	{
-//		[self addCursorRect: [[self enclosingScrollView] documentVisibleRect] cursor: [NSCursor crosshairCursor]];
-//	}
-	else
-	{
-		[super resetCursorRects];
-	}
+	return NO;
 }
 
 #pragma mark Menubar
@@ -454,16 +386,29 @@ typedef enum OCRDragEnum {
 {
 	if ([menuItem action] == @selector(copy:))
 	{
-		return [self.selectionPieces count] != 0;
+		BOOL isValid = [self.selectionPieces count] != 0;
+		menuItem.title = isValid ? @"Copy Text" : @"Copy";
+		return isValid;
 	}
-	else if ([menuItem action] == @selector(selectAll:) || [menuItem action] == @selector(startSpeaking:))
+	else if ([menuItem action] == @selector(selectAll:))
 	{
 		if (@available(macOS 10.15, *))
 		{
 			return [self.textPieces count] != 0 && [self.textPieces count] != [self.selectionPieces count];
 		} else {
-			return NO;
+			return  NO;
 		}
+		return YES;
+	}
+	else if ([menuItem action] == @selector(startSpeaking:))
+	{
+		if (@available(macOS 10.15, *))
+		{
+			return [self.textPieces count] != 0;
+		} else {
+			return  NO;
+		}
+		return YES;
 	}
 	else if ([menuItem action] == @selector(stopSpeaking:))
 	{
@@ -496,8 +441,8 @@ typedef enum OCRDragEnum {
 			NSRange r = NSMakeRange(0, text1.firstObject.string.length);
 			self.selectionPieces[piece] = [NSValue valueWithRange:r];
 		}
-		[self setNeedsDisplay:YES];
-		[self.window invalidateCursorRectsForView:self];
+		[self.view setNeedsDisplay:YES];
+		[self.view.window invalidateCursorRectsForView:self.view];
 	}
 }
 
