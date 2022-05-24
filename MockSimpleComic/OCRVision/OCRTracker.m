@@ -65,13 +65,8 @@ static NSRange UnionRanges(NSRange early, NSRange late)
 
 static NSSpeechSynthesizer *sSpeechSynthesizer;
 
-typedef enum OCRDragEnum {
-	OCRDragEnumNot,
-	OCRDragEnumIBeam
-} OCRDragEnum;
-
 @interface OCRTracker()
-@property OCRDragEnum dragKind;
+@property BOOL isDragging;
 
 /// <VNRecognizedTextObservation *> - 10.15 and newer
 @property NSArray *textPieces;
@@ -344,7 +339,7 @@ typedef enum OCRDragEnum {
 - (void)mouseDragText:(NSEvent *)theEvent textPiece:(NSObject *)textPiece
 {
 	NSPoint startPoint = [self.view convertPoint:[theEvent locationInWindow] fromView:nil];
-	self.dragKind = OCRDragEnumIBeam;
+	self.isDragging = YES;
 	NSMutableDictionary *previousSelection = [NSMutableDictionary dictionary];
 	if (theEvent.modifierFlags & NSEventModifierFlagCommand)
 	{
@@ -363,7 +358,7 @@ typedef enum OCRDragEnum {
 		theEvent = [[self.view window] nextEventMatchingMask: NSEventMaskLeftMouseUp | NSEventMaskLeftMouseDragged];
 	}
 	[self.view.window invalidateCursorRectsForView:self.view];
-	self.dragKind = OCRDragEnumNot;
+	self.isDragging = NO;
 }
 
 - (void)updateSelectionFromDownRect:(NSRect)downRect previousSelection:(NSMutableDictionary *)previousSelection
@@ -462,7 +457,7 @@ typedef enum OCRDragEnum {
 
 - (BOOL)didResetCursorRects
 {
-	if (self.dragKind == OCRDragEnumIBeam) {
+	if (self.isDragging) {
 		[self.view addCursorRect: [[[self view] enclosingScrollView] documentVisibleRect] cursor:[NSCursor IBeamCursor]];
 		return YES;
 	}
