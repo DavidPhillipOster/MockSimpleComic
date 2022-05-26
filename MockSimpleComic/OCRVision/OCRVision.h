@@ -18,7 +18,7 @@ enum {
 @class VNRecognizedTextObservation;
 
 /// When the  OCR is complete, it will pass your continuation block an object that responds to this protocol.
-@protocol OCRVisionComplete <NSObject>
+@protocol OCRVisionResults <NSObject>
 
 /// all the text on the page.
 @property(readonly) NSString *allText;
@@ -33,7 +33,7 @@ enum {
 
 /// Wrap up the Vision OCR framework in a  simple API
 API_AVAILABLE(macos(10.15))
-@interface OCRVision : NSObject<OCRVisionComplete>
+@interface OCRVision : NSObject
 
 /// The list of languages the VisionFramework will accept. en_US is the default. Empty array means the VisionFramework is not available.
 @property(class, readonly) NSArray<NSString *> *ocrLanguages;
@@ -42,21 +42,21 @@ API_AVAILABLE(macos(10.15))
 @property(class, nullable, setter=setOCRLanguage:) NSString *ocrLanguage;
 
 
-/// Run the ocr engine on the image in the default language. When it's done, call the completion passing an object that implements the OCRVisionComplete protocol
+/// Run the ocr engine on the image in the default language. When it's done, call the completion passing an object that implements the OCRVisionResults protocol
 ///
 ///  Note: does its work on a background concurrent GCD queue. Completion is called on that queue.
 ///
 /// @param image - the image to OCR
 /// @param completion - a block passed an object that corresponds to the OCRVision protocol.
-- (void)ocrImage:(NSImage *)image completion:(void (^)(id<OCRVisionComplete> _Nonnull ocrDone))completion;
+- (void)ocrImage:(NSImage *)image completion:(void (^)(id<OCRVisionResults> _Nonnull ocrResults))completion;
 
-/// Run the ocr engine on the image in the default language. When it's done, call the completion passing an object that implements the OCRVisionComplete protocol
+/// Run the ocr engine on the image in the default language. When it's done, call the completion passing an object that implements the OCRVisionResults protocol
 ///
 ///  Note: does its work on a background concurrent GCD queue. Completion is called on that queue.
 ///
 /// @param cgImage - the image to OCR
 /// @param completion - a block passed an object that corresponds to the OCRVision protocol.
-- (void)ocrCGImage:(CGImageRef)cgImage completion:(void (^)(id<OCRVisionComplete> _Nonnull ocrDone))completion;
+- (void)ocrCGImage:(CGImageRef)cgImage completion:(void (^)(id<OCRVisionResults> _Nonnull ocrResults))completion;
 
 @end
 

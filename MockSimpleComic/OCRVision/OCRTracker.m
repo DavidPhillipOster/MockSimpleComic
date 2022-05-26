@@ -72,7 +72,7 @@ static NSSpeechSynthesizer *sSpeechSynthesizer;
 @property NSArray *textPieces;
 
 // Key is VNRecognizedTextObservation.
-// The is the range of the underlying string to show as selected.
+// The value is the NSRange of the underlying string to show as selected.
 @property NSMutableDictionary<NSObject *, NSValue *> *selectionPieces;
 
 @property (weak, nullable) NSView *view;
@@ -172,7 +172,7 @@ static NSSpeechSynthesizer *sSpeechSynthesizer;
 	return [a componentsJoinedByString:@"\n"];
 }
 
-- (nullable NSObject *)textPieceForMouseEvent:(NSEvent *)theEvent
+- (nullable VNRecognizedTextObservation *)textPieceForMouseEvent:(NSEvent *)theEvent API_AVAILABLE(macos(10.15))
 {
 	NSPoint where = [self.view convertPoint:[theEvent locationInWindow] fromView:nil];
 	return [self textPieceForPoint:where];
@@ -182,7 +182,7 @@ static NSSpeechSynthesizer *sSpeechSynthesizer;
 ///
 /// @param where - a point in View coordinates,
 /// @return the textPiece that contains that point
-- (nullable NSObject *)textPieceForPoint:(CGPoint)where
+- (nullable VNRecognizedTextObservation *)textPieceForPoint:(CGPoint)where API_AVAILABLE(macos(10.15))
 {
 	if (@available(macOS 10.15, *))
 	{
@@ -242,11 +242,15 @@ static NSSpeechSynthesizer *sSpeechSynthesizer;
 
 #pragma mark OCR
 
-- (void)ocrDidFinish:(id<OCRVisionComplete>)complete
+/// Housekeeping around being called by the OCR engine.
+///
+///  Since this will affect the U.I., sets state on the main thread.
+/// @param results -  the OCR's results object.
+- (void)ocrDidFinish:(id<OCRVisionResults>)results
 {
 	NSArray *textPieces = @[];
 	if (@available(macOS 10.15, *)) {
-		textPieces = complete.textObservations;
+		textPieces = results.textObservations;
 	}
 	// Since we are changing state that affects the U.I., we do it on the main thread in the future,
 	// but `complete` isn't guaranteed to exist then, so we assign to locals so it will be captured
@@ -264,7 +268,7 @@ static NSSpeechSynthesizer *sSpeechSynthesizer;
 	if (@available(macOS 10.15, *)) {
 		__block OCRVision *ocrVision = [[OCRVision alloc] init];
 		dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
-			[ocrVision ocrImage:image completion:^(id<OCRVisionComplete> _Nonnull complete) {
+			[ocrVision ocrImage:image completion:^(id<OCRVisionResults> _Nonnull complete) {
 				[self ocrDidFinish:complete];
 				ocrVision = nil;
 			}];
@@ -277,7 +281,7 @@ static NSSpeechSynthesizer *sSpeechSynthesizer;
 	if (@available(macOS 10.15, *)) {
 		__block OCRVision *ocrVision = [[OCRVision alloc] init];
 		dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
-			[ocrVision ocrCGImage:cgImage completion:^(id<OCRVisionComplete> _Nonnull complete) {
+			[ocrVision ocrCGImage:cgImage completion:^(id<OCRVisionResults> _Nonnull complete) {
 				[self ocrDidFinish:complete];
 				ocrVision = nil;
 			}];
@@ -290,7 +294,10 @@ static NSSpeechSynthesizer *sSpeechSynthesizer;
 
 - (BOOL)didMouseDown:(NSEvent *)theEvent
 {
-	NSObject *textPiece = [self textPieceForMouseEvent:theEvent];
+	NSObject *textPiece = nil;
+	if (@available(macOS 10.15, *)) {
+		textPiece = [self textPieceForMouseEvent:theEvent];
+	}
 	BOOL isDoingMouseDown = (textPiece != nil);
 	if (isDoingMouseDown)
 	{
@@ -327,7 +334,10 @@ static NSSpeechSynthesizer *sSpeechSynthesizer;
 
 - (BOOL)didMouseDragged:(NSEvent *)theEvent
 {
-	NSObject *textPiece = [self textPieceForMouseEvent:theEvent];
+	NSObject *textPiece = nil;
+	if (@available(macOS 10.15, *)) {
+		textPiece = [self textPieceForMouseEvent:theEvent];
+	}
 	BOOL isDoingMouseDragged = (textPiece != nil);
 	if (isDoingMouseDragged)
 	{
@@ -361,6 +371,8 @@ static NSSpeechSynthesizer *sSpeechSynthesizer;
 	self.isDragging = NO;
 }
 
+/// @param downRect - the rectangle in image coordinates from the start mouse position to the current mouse position.
+/// @param previousSelection - the selection as it was before the call to this. This method will update it.
 - (void)updateSelectionFromDownRect:(NSRect)downRect previousSelection:(NSMutableDictionary *)previousSelection
 {
 	if (@available(macOS 10.15, *))

@@ -14,7 +14,8 @@ static NSArray<NSString *> *sOCRLanguages;
 // ocrErrors use this NSError Domain
 NSErrorDomain const OCRVisionDomain = @"OCRVisionDomain";
 
-@interface OCRVision()
+/// Rather than allocate a new object to pass the results, just make the OCRVision object do double duty.
+@interface OCRVision()<OCRVisionResults>
 @property(readwrite) NSArray<VNRecognizedTextObservation *> *textObservations;
 @property(readwrite, nullable, setter=setOCRError:) NSError *ocrError;
 @end
@@ -68,7 +69,7 @@ NSErrorDomain const OCRVisionDomain = @"OCRVisionDomain";
 
 #pragma mark OCR
 
-- (void)callCompletion:(void (^)(id<OCRVisionComplete> _Nonnull))completion
+- (void)callCompletion:(void (^)(id<OCRVisionResults> _Nonnull))completion
 					observations:(NSArray<VNRecognizedTextObservation *> *)observations
 								 error:(NSError *)error
 {
@@ -99,7 +100,7 @@ NSErrorDomain const OCRVisionDomain = @"OCRVisionDomain";
 /// @param request - The VNRecognizeTextRequest
 /// @param error - if non-nil, the VNRecognizeTextRequest is reporting an error.
 - (void)handleTextRequest:(nullable VNRequest *)request
-							 completion:(void (^)(id<OCRVisionComplete> _Nonnull))completion
+							 completion:(void (^)(id<OCRVisionResults> _Nonnull))completion
 										error:(nullable NSError *)error
 {
 	if (error)
@@ -133,7 +134,7 @@ NSErrorDomain const OCRVisionDomain = @"OCRVisionDomain";
 	}
 }
 
-- (void)ocrCGImage:(CGImageRef)cgImage completion:(void (^)(id<OCRVisionComplete> _Nonnull))completion
+- (void)ocrCGImage:(CGImageRef)cgImage completion:(void (^)(id<OCRVisionResults> _Nonnull))completion
 {
   __weak typeof(self) weakSelf = self;
   VNRecognizeTextRequest *textRequest =
@@ -147,6 +148,7 @@ NSErrorDomain const OCRVisionDomain = @"OCRVisionDomain";
 		if (ocrLanguage)
 		{
 			textRequest.recognitionLanguages = @[ocrLanguage];
+			textRequest.usesLanguageCorrection = YES;
 		}
 		NSError *error = nil;
     VNImageRequestHandler *handler = [[VNImageRequestHandler alloc] initWithCGImage:cgImage options:@{}];
@@ -163,7 +165,7 @@ NSErrorDomain const OCRVisionDomain = @"OCRVisionDomain";
   }
 }
 
-- (void)ocrImage:(NSImage *)image completion:(void (^)(id<OCRVisionComplete> _Nonnull))completion
+- (void)ocrImage:(NSImage *)image completion:(void (^)(id<OCRVisionResults> _Nonnull))completion
 {
 	NSData *imageData = image.TIFFRepresentation;
 	if(imageData != nil)
