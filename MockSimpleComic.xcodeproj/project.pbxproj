@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		6304B5F8284086D3009E7D61 /* OCRSelectionLayer.m in Sources */ = {isa = PBXBuildFile; fileRef = 6304B5F7284086D3009E7D61 /* OCRSelectionLayer.m */; };
 		63749DC32839B14B004E2B64 /* OCRVision.m in Sources */ = {isa = PBXBuildFile; fileRef = 63749DC22839B14B004E2B64 /* OCRVision.m */; };
 		63749DC62839B285004E2B64 /* SimpleImagePageView.m in Sources */ = {isa = PBXBuildFile; fileRef = 63749DC42839B285004E2B64 /* SimpleImagePageView.m */; };
 		63749DC92839B679004E2B64 /* OCRTracker.m in Sources */ = {isa = PBXBuildFile; fileRef = 63749DC82839B679004E2B64 /* OCRTracker.m */; };
@@ -19,6 +20,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		6304B5F62840864F009E7D61 /* OCRSelectionLayer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = OCRSelectionLayer.h; sourceTree = "<group>"; };
+		6304B5F7284086D3009E7D61 /* OCRSelectionLayer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = OCRSelectionLayer.m; sourceTree = "<group>"; };
 		63749DC12839B14B004E2B64 /* OCRVision.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OCRVision.h; sourceTree = "<group>"; };
 		63749DC22839B14B004E2B64 /* OCRVision.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = OCRVision.m; sourceTree = "<group>"; };
 		63749DC42839B285004E2B64 /* SimpleImagePageView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = SimpleImagePageView.m; sourceTree = "<group>"; };
@@ -51,6 +54,8 @@
 		63749DC02839B14B004E2B64 /* OCRVision */ = {
 			isa = PBXGroup;
 			children = (
+				6304B5F62840864F009E7D61 /* OCRSelectionLayer.h */,
+				6304B5F7284086D3009E7D61 /* OCRSelectionLayer.m */,
 				63749DC72839B679004E2B64 /* OCRTracker.h */,
 				63749DC82839B679004E2B64 /* OCRTracker.m */,
 				63749DC12839B14B004E2B64 /* OCRVision.h */,
@@ -172,6 +177,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				63EE685A2832ADA500FDA444 /* main.m in Sources */,
+				6304B5F8284086D3009E7D61 /* OCRSelectionLayer.m in Sources */,
 				63749DC62839B285004E2B64 /* SimpleImagePageView.m in Sources */,
 				63749DC32839B14B004E2B64 /* OCRVision.m in Sources */,
 				63EE68532832ADA300FDA444 /* AppDelegate.m in Sources */,

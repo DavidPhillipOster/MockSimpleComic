@@ -6,12 +6,13 @@
 
 #import "OCRTracker.h"
 
+#import "OCRSelectionLayer.h"
 #import "OCRVision.h"
 #import <Vision/Vision.h>
 
 /// @return the quadrilateral of the rect observation as a NSBezierPath/
 API_AVAILABLE(macos(10.15))
-static NSBezierPath *BezierPathFromRectObservation(VNRectangleObservation *piece)
+static NSBezierPath *OCRBezierPathFromRectObservation(VNRectangleObservation *piece)
 {
 	NSBezierPath *path = [NSBezierPath bezierPath];
 	[path moveToPoint:piece.topLeft];
@@ -26,12 +27,12 @@ static NSBezierPath *BezierPathFromRectObservation(VNRectangleObservation *piece
 /// @param r - the range of the string of the TextObservation
 /// @return the quadrilateral of the text observation as a NSBezierPath/
 API_AVAILABLE(macos(10.15))
-static NSBezierPath *BezierPathFromTextObservationRange(VNRecognizedTextObservation *piece, NSRange r)
+NSBezierPath *OCRBezierPathFromTextObservationRange(VNRecognizedTextObservation *piece, NSRange r)
 {
 	VNRecognizedText *recognizedText = [[piece topCandidates:1] firstObject];
 	// VNRectangleObservation is a superclass of VNRecognizedTextObservation. On error, use the whole thing.
 	VNRectangleObservation *rect = [recognizedText boundingBoxForRange:r error:NULL] ?: piece;
-	return BezierPathFromRectObservation(rect);
+	return OCRBezierPathFromRectObservation(rect);
 }
 
 
@@ -64,84 +65,6 @@ static NSRange UnionRanges(NSRange early, NSRange late)
 
 
 static NSSpeechSynthesizer *sSpeechSynthesizer;
-
-static CGPathRef CGPathFromNSBezierQuadPath(NSBezierPath *path)
-{
-	CGMutablePathRef p = CGPathCreateMutable();
-	NSInteger numElements = [path elementCount];
-	NSPoint points[3];
-	for (NSInteger i = 0; i < numElements; i++)
-	{
-		switch ([path elementAtIndex:i associatedPoints:points])
-		{
-			case NSMoveToBezierPathElement:
-				CGPathMoveToPoint(p, NULL, points[0].x, points[0].y);
-				break;
-			case NSLineToBezierPathElement:
-				CGPathAddLineToPoint(p, NULL, points[0].x, points[0].y);
-				break;
-			case NSBezierPathElementClosePath:
-				CGPathCloseSubpath(p);
-				break;
-			default:
-				break;
-		}
-	}
-	return p;
-}
-
-API_AVAILABLE(macos(10.15))
-@interface OCRSelectionLayer : CALayer
-- (instancetype)initWithObservations:(NSArray *)observations selection:(NSDictionary *)selection imageLayer:(CALayer *)imageLayer;
-@end
-
-@interface OCRSelectionLayer ()
-@property NSArray *textPieces;
-@property NSDictionary *selection;
-@property NSSize imageSize;
-@end
-@implementation OCRSelectionLayer
-- (instancetype)initWithObservations:(NSArray *)observations selection:(NSDictionary *)selection  imageLayer:(CALayer *)imageLayer
-{
-	self = [super init];
-	if (self) {
-		_textPieces = observations;
-		_selection = selection;
-		_imageSize = NSMakeSize(CGImageGetWidth((CGImageRef)imageLayer.contents), CGImageGetHeight((CGImageRef)imageLayer.contents));
-		[self setPosition:imageLayer.position];
-		[self setBounds:imageLayer.bounds];
-		[self setNeedsDisplay];
-	}
-	return self;
-}
-
-- (void)drawInContext:(CGContextRef)ctx
-{
-	CGContextSaveGState(ctx);
-
-	CGContextSetFillColorWithColor(ctx, [[NSColor.yellowColor colorWithAlphaComponent:0.4] CGColor]);
-
-
-	NSAffineTransform *transform = [NSAffineTransform transform];
-	[transform scaleXBy:self.bounds.size.width yBy:self.bounds.size.height];
-	for (VNRecognizedTextObservation *piece in self.textPieces)
-	{
-		NSValue *rangeValue = self.selection[piece];
-		if (rangeValue != nil)
-		{
-			NSBezierPath *path1 = BezierPathFromTextObservationRange(piece, rangeValue.rangeValue);
-			[path1 transformUsingAffineTransform:transform];
-			CGPathRef p = CGPathFromNSBezierQuadPath(path1);
-			CGContextAddPath(ctx, p);
-			CGContextFillPath(ctx);
-			CGPathRelease(p);
-		}
-	}
-	CGContextRestoreGState(ctx);
-}
-
-@end
-
 
 @interface OCRTracker()
 @property BOOL isDragging;
@@ -293,7 +216,7 @@ API_AVAILABLE(macos(10.15))
 
 	NSAffineTransform *transform = [NSAffineTransform transform];
 	[transform scaleXBy:self.view.bounds.size.width yBy:self.view.bounds.size.height];
-	NSBezierPath *path = BezierPathFromTextObservationRange(piece, charRange);
+	NSBezierPath *path = OCRBezierPathFromTextObservationRange(piece, charRange);
 	CGRect r = path.bounds;
 	r.origin = [transform transformPoint:r.origin];
 	r.size = [transform transformSize:r.size];

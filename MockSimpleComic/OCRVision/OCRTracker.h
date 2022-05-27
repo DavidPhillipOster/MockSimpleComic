@@ -8,6 +8,8 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+@class VNRecognizedTextObservation;
+
 /// Provide mouse tracking services for an NSImageView to track the recognized text.
 @interface OCRTracker : NSResponder
 
@@ -50,5 +52,15 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)becomeNextResponder;
 
 @end
+
+///  Get the bezierPath of a part of a text observation.
+///
+///  Used by both OCRTtracker and OCRSelectionLayer
+///
+/// @param piece - the TextObservation
+/// @param r - the range of the string of the TextObservation
+/// @return the quadrilateral of the text observation as a NSBezierPath/
+API_AVAILABLE(macos(10.15))
+NSBezierPath *OCRBezierPathFromTextObservationRange(VNRecognizedTextObservation *piece, NSRange r);
 
 NS_ASSUME_NONNULL_END
