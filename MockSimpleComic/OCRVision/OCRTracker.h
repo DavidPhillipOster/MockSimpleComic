@@ -31,19 +31,22 @@ NS_ASSUME_NONNULL_BEGIN
 
 #pragma  mark -
 
-/// After owning views, call this to draw the selection as a tint on the view.
-- (void)drawRect:(NSRect)dirtyRect;
+///
+/// @param image the key for the cached selection
+/// @param imageLayer the layer that draws the CGmage
+/// @return The layer that draws the hiliting of the selected text.
+- (nullable CALayer *)layerForImage:(NSImage *)image imageLayer:(CALayer *)imageLayer;
 
-/// return YES if this handles the mouse down.
+/// @return YES if this handles the mouse down.
 - (BOOL)didMouseDown:(NSEvent *)theEvent;
 
-/// return YES if this handles the mouse drag.
+/// @return YES if this handles the mouse drag.
 - (BOOL)didMouseDragged:(NSEvent *)theEvent;
 
-/// return YES if this handles setting the cursor rects.
+/// @return YES if this handles setting the cursor rects.
 - (BOOL)didResetCursorRects;
 
-/// When owning view becomes first responder, call this so it is next.
+/// When owning view becomes first responder, call this so this object is next.
 - (void)becomeNextResponder;
 
 @end

@@ -50,8 +50,28 @@
 
 - (void)drawRect:(NSRect)dirtyRect
 {
-	[super drawRect:dirtyRect];
-	[self.tracker drawRect:dirtyRect];
+	self.layer.sublayers = nil;
+
+	CALayer* newLayer = [[CALayer alloc]init];
+	NSData *firstPageImageData = self.image.TIFFRepresentation;
+	if (firstPageImageData != nil) {
+		CGImageSourceRef firstPageImageSource = CGImageSourceCreateWithData((__bridge CFDataRef)firstPageImageData, NULL);
+		CGImageRef firstPageImageRef =  CGImageSourceCreateImageAtIndex(firstPageImageSource, 0, NULL);
+		CFRelease(firstPageImageSource);
+
+		CALayer *firstPageLayer = [CALayer layer];
+		firstPageLayer.contents = (__bridge id) firstPageImageRef;
+		CFRelease(firstPageImageRef);
+
+		NSRect frame = [self frame];	// ?
+		[firstPageLayer setFrame:frame];
+		[newLayer addSublayer:firstPageLayer];
+		CALayer *selectionLayer = [self.tracker layerForImage:self.image imageLayer:firstPageLayer];
+		if (selectionLayer) {
+			[newLayer addSublayer:selectionLayer];
+		}
+	}
+	[self.layer addSublayer:newLayer];
 }
 
 #pragma mark OCR

@@ -10,6 +10,8 @@ NS_ASSUME_NONNULL_BEGIN
 /// A simple imageView, that just supports scrolling and a hand-cursor for scrolling.
 @interface SimpleImagePageView : NSView
 
+@property NSImage *image;
+
 /// The selected text as a single string. Readonly, because it is selected using the mouse. nil if not available. always nil, for now.
 @property(readonly, nullable) NSString *selection;
 

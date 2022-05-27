@@ -65,6 +65,84 @@ static NSRange UnionRanges(NSRange early, NSRange late)
 
 static NSSpeechSynthesizer *sSpeechSynthesizer;
 
+static CGPathRef CGPathFromNSBezierQuadPath(NSBezierPath *path)
+{
+	CGMutablePathRef p = CGPathCreateMutable();
+	NSInteger numElements = [path elementCount];
+	NSPoint points[3];
+	for (NSInteger i = 0; i < numElements; i++)
+	{
+		switch ([path elementAtIndex:i associatedPoints:points])
+		{
+			case NSMoveToBezierPathElement:
+				CGPathMoveToPoint(p, NULL, points[0].x, points[0].y);
+				break;
+			case NSLineToBezierPathElement:
+				CGPathAddLineToPoint(p, NULL, points[0].x, points[0].y);
+				break;
+			case NSBezierPathElementClosePath:
+				CGPathCloseSubpath(p);
+				break;
+			default:
+				break;
+		}
+	}
+	return p;
+}
+
+API_AVAILABLE(macos(10.15))
+@interface OCRSelectionLayer : CALayer
+- (instancetype)initWithObservations:(NSArray *)observations selection:(NSDictionary *)selection imageLayer:(CALayer *)imageLayer;
+@end
+
+@interface OCRSelectionLayer ()
+@property NSArray *textPieces;
+@property NSDictionary *selection;
+@property NSSize imageSize;
+@end
+@implementation OCRSelectionLayer
+- (instancetype)initWithObservations:(NSArray *)observations selection:(NSDictionary *)selection  imageLayer:(CALayer *)imageLayer
+{
+	self = [super init];
+	if (self) {
+		_textPieces = observations;
+		_selection = selection;
+		_imageSize = NSMakeSize(CGImageGetWidth((CGImageRef)imageLayer.contents), CGImageGetHeight((CGImageRef)imageLayer.contents));
+		[self setPosition:imageLayer.position];
+		[self setBounds:imageLayer.bounds];
+		[self setNeedsDisplay];
+	}
+	return self;
+}
+
+- (void)drawInContext:(CGContextRef)ctx
+{
+	CGContextSaveGState(ctx);
+
+	CGContextSetFillColorWithColor(ctx, [[NSColor.yellowColor colorWithAlphaComponent:0.4] CGColor]);
+
+
+	NSAffineTransform *transform = [NSAffineTransform transform];
+	[transform scaleXBy:self.bounds.size.width yBy:self.bounds.size.height];
+	for (VNRecognizedTextObservation *piece in self.textPieces)
+	{
+		NSValue *rangeValue = self.selection[piece];
+		if (rangeValue != nil)
+		{
+			NSBezierPath *path1 = BezierPathFromTextObservationRange(piece, rangeValue.rangeValue);
+			[path1 transformUsingAffineTransform:transform];
+			CGPathRef p = CGPathFromNSBezierQuadPath(path1);
+			CGContextAddPath(ctx, p);
+			CGContextFillPath(ctx);
+			CGPathRelease(p);
+		}
+	}
+	CGContextRestoreGState(ctx);
+}
+
+@end
+
+
 @interface OCRTracker()
 @property BOOL isDragging;
 
@@ -104,35 +182,18 @@ static NSSpeechSynthesizer *sSpeechSynthesizer;
   return YES;
 }
 
-- (void)drawRect:(NSRect)dirtyRect
-{
-	if (self.textPieces == nil)
+/// @return a layer of the selection for image scaled to frame.
+- (nullable CALayer *)layerForImage:(NSImage *)image imageLayer:(CALayer *)imageLayer {
+	CALayer *layer = nil;
+	if (@available(macOS 10.15, *))
 	{
-		if (@available(macOS 10.15, *))
+		if (self.textPieces != nil)
 		{
-			// temporary, to show we haven't run the OCR yet.
-			[[NSColor.yellowColor colorWithAlphaComponent:0.4] set];
-			CGRect smallBounds = CGRectInset(self.view.bounds, 20, 20);
-			NSRectFill(smallBounds);
-		}
-	} else {
-		if (@available(macOS 10.15, *))
-		{
-			NSAffineTransform *transform = [NSAffineTransform transform];
-			[transform scaleXBy:self.view.bounds.size.width yBy:self.view.bounds.size.height];
-			for (VNRecognizedTextObservation *piece in self.textPieces)
-			{
-				NSValue *rangeValue = self.selectionPieces[piece];
-				if (rangeValue != nil)
-				{
-					NSBezierPath *path = BezierPathFromTextObservationRange(piece, rangeValue.rangeValue);
-					[path transformUsingAffineTransform:transform];
-					[[NSColor.yellowColor colorWithAlphaComponent:0.4] set];
-					[path fill];
-				}
-			}
+			return [[OCRSelectionLayer alloc] initWithObservations:self.textPieces selection:self.selectionPieces imageLayer:imageLayer];
 		}
 	}
+	return layer;
+
 }
 
 #pragma mark Model
