@@ -63,7 +63,7 @@
 		firstPageLayer.contents = (__bridge id) firstPageImageRef;
 		CFRelease(firstPageImageRef);
 
-		NSRect frame = [self frame];	// ?
+		NSRect frame = [self imageFrame];
 		[firstPageLayer setFrame:frame];
 		[newLayer addSublayer:firstPageLayer];
 		CALayer *selectionLayer = [self.tracker layerForImage:self.image imageLayer:firstPageLayer];
@@ -71,6 +71,26 @@
 			[newLayer addSublayer:selectionLayer];
 		}
 	}
+
+	NSData *secondPageImageData = self.image2.TIFFRepresentation;
+	if (secondPageImageData != nil) {
+		CGImageSourceRef secondPageImageSource = CGImageSourceCreateWithData((__bridge CFDataRef)secondPageImageData, NULL);
+		CGImageRef secondPageImageRef =  CGImageSourceCreateImageAtIndex(secondPageImageSource, 0, NULL);
+		CFRelease(secondPageImageSource);
+
+		CALayer *secondPageLayer = [CALayer layer];
+		secondPageLayer.contents = (__bridge id) secondPageImageRef;
+		CFRelease(secondPageImageRef);
+
+		NSRect frame = [self image2Frame];
+		[secondPageLayer setFrame:frame];
+		[newLayer addSublayer:secondPageLayer];
+		CALayer *selectionLayer = [self.tracker layerForImage:self.image2 imageLayer:secondPageLayer];
+		if (selectionLayer) {
+			[newLayer addSublayer:selectionLayer];
+		}
+	}
+
 	[self.layer addSublayer:newLayer];
 }
 
@@ -81,9 +101,9 @@
 	[self.tracker ocrImage:image];
 }
 
-- (void)ocrCGImage:(CGImageRef)cgImage
+- (void)ocrImage2:(NSImage *)image
 {
-	[self.tracker ocrCGImage:cgImage];
+	[self.tracker ocrImage2:image];
 }
 
 

@@ -22,8 +22,8 @@ NS_ASSUME_NONNULL_BEGIN
 /// Run the ocr engine on the image in the default language.
 - (void)ocrImage:(NSImage *)image;
 
-/// Run the ocr engine on the CGimage in the default language.
-- (void)ocrCGImage:(CGImageRef)cgImage;
+- (void)ocrImage2:(NSImage *)image;
+
 
 - (instancetype)initWithView:(NSView *)view NS_DESIGNATED_INITIALIZER;
 

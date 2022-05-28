@@ -11,6 +11,10 @@ NS_ASSUME_NONNULL_BEGIN
 @interface SimpleImagePageView : NSView
 
 @property NSImage *image;
+@property NSRect imageFrame;
+
+@property NSImage *image2;
+@property NSRect image2Frame;
 
 /// The selected text as a single string. Readonly, because it is selected using the mouse. nil if not available. always nil, for now.
 @property(readonly, nullable) NSString *selection;
@@ -21,8 +25,8 @@ NS_ASSUME_NONNULL_BEGIN
 /// Run the ocr engine on the image in the default language.
 - (void)ocrImage:(NSImage *)image;
 
-/// Run the ocr engine on the CGimage in the default language.
-- (void)ocrCGImage:(CGImageRef)cgImage;
+/// Run the ocr engine on the image in the default language.
+- (void)ocrImage2:(NSImage *)image;
 
 @end
 
