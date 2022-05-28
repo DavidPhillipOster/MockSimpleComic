@@ -92,6 +92,7 @@
 	}
 
 	[self.layer addSublayer:newLayer];
+	[self resetCursorRects];	// since it depends on the layers
 }
 
 #pragma mark OCR

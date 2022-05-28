@@ -11,6 +11,7 @@
 		63749DC32839B14B004E2B64 /* OCRVision.m in Sources */ = {isa = PBXBuildFile; fileRef = 63749DC22839B14B004E2B64 /* OCRVision.m */; };
 		63749DC62839B285004E2B64 /* SimpleImagePageView.m in Sources */ = {isa = PBXBuildFile; fileRef = 63749DC42839B285004E2B64 /* SimpleImagePageView.m */; };
 		63749DC92839B679004E2B64 /* OCRTracker.m in Sources */ = {isa = PBXBuildFile; fileRef = 63749DC82839B679004E2B64 /* OCRTracker.m */; };
+		63B29390284296DE0061E174 /* test2.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 63B2938F284296DE0061E174 /* test2.jpg */; };
 		63EE68532832ADA300FDA444 /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 63EE68522832ADA300FDA444 /* AppDelegate.m */; };
 		63EE68552832ADA500FDA444 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 63EE68542832ADA500FDA444 /* Assets.xcassets */; };
 		63EE68582832ADA500FDA444 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 63EE68562832ADA500FDA444 /* MainMenu.xib */; };
@@ -28,6 +29,7 @@
 		63749DC52839B285004E2B64 /* SimpleImagePageView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SimpleImagePageView.h; sourceTree = "<group>"; };
 		63749DC72839B679004E2B64 /* OCRTracker.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = OCRTracker.h; sourceTree = "<group>"; };
 		63749DC82839B679004E2B64 /* OCRTracker.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = OCRTracker.m; sourceTree = "<group>"; };
+		63B2938F284296DE0061E174 /* test2.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = test2.jpg; sourceTree = "<group>"; };
 		63EE684E2832ADA300FDA444 /* MockSimpleComic.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MockSimpleComic.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		63EE68512832ADA300FDA444 /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
 		63EE68522832ADA300FDA444 /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
@@ -91,6 +93,7 @@
 				63749DC02839B14B004E2B64 /* OCRVision */,
 				63EE68542832ADA500FDA444 /* Assets.xcassets */,
 				63EE68612832ADD300FDA444 /* test.jpg */,
+				63B2938F284296DE0061E174 /* test2.jpg */,
 				63EE68562832ADA500FDA444 /* MainMenu.xib */,
 				63EE68592832ADA500FDA444 /* main.m */,
 				63EE685B2832ADA500FDA444 /* MockSimpleComic.entitlements */,
@@ -165,6 +168,7 @@
 			files = (
 				63EE68552832ADA500FDA444 /* Assets.xcassets in Resources */,
 				63EE68622832ADD300FDA444 /* test.jpg in Resources */,
+				63B29390284296DE0061E174 /* test2.jpg in Resources */,
 				63EE68582832ADA500FDA444 /* MainMenu.xib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

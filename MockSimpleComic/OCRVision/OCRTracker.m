@@ -66,9 +66,12 @@ static NSRange UnionRanges(NSRange early, NSRange late)
 
 static NSSpeechSynthesizer *sSpeechSynthesizer;
 
+/// Bundle up all the data associated with our client's image.
 @interface OCRDatum : NSObject
 
-@property NSImage *image;
+@property(weak) NSImage *image;
+
+@property(weak) CALayer *selectionLayer;
 
 /// <VNRecognizedTextObservation *> - 10.15 and newer
 @property NSArray *textPieces;
@@ -132,7 +135,7 @@ static NSSpeechSynthesizer *sSpeechSynthesizer;
 - (BOOL)isAnySelected {
 	for (OCRDatum *datum in self.datums)
 	{
-		if (datum.selectionPieces.count != 0)
+		if (datum.image != nil && datum.selectionPieces.count != 0)
 		{
 			return YES;
 		}
@@ -145,7 +148,9 @@ static NSSpeechSynthesizer *sSpeechSynthesizer;
 	NSInteger total = 0;
 	for (OCRDatum *datum in self.datums)
 	{
-		total += datum.textPieces.count;
+		if (datum.image != nil) {
+			total += datum.textPieces.count;
+		}
 	}
 	return total;
 }
@@ -155,7 +160,9 @@ static NSSpeechSynthesizer *sSpeechSynthesizer;
 	NSInteger total = 0;
 	for (OCRDatum *datum in self.datums)
 	{
-		total += datum.selectionPieces.count;
+		if (datum.image != nil) {
+			total += datum.selectionPieces.count;
+		}
 	}
 	return total;
 }
@@ -166,7 +173,7 @@ static NSSpeechSynthesizer *sSpeechSynthesizer;
 	{
 		for (OCRDatum *datum in self.datums)
 		{
-			if ([datum.textPieces containsObject:textPiece]) {
+			if (datum.image != nil && [datum.textPieces containsObject:textPiece]) {
 				datum.selectionPieces[textPiece] = previousSelection[textPiece];
 				break;
 			}
@@ -181,9 +188,11 @@ static NSSpeechSynthesizer *sSpeechSynthesizer;
 	if (@available(macOS 10.15, *))
 	{
 		OCRDatum *datum = [self datumOfImage:image];
-		if (datum.textPieces != nil)
+		if (datum.image != nil && datum.textPieces != nil)
 		{
-			return [[OCRSelectionLayer alloc] initWithObservations:datum.textPieces selection:datum.selectionPieces imageLayer:imageLayer];
+			OCRSelectionLayer *selectionLayer =  [[OCRSelectionLayer alloc] initWithObservations:datum.textPieces selection:datum.selectionPieces imageLayer:imageLayer];
+			datum.selectionLayer = selectionLayer;
+			return selectionLayer;
 		}
 	}
 	return layer;
@@ -198,10 +207,13 @@ static NSSpeechSynthesizer *sSpeechSynthesizer;
 		NSMutableArray *a = [NSMutableArray array];
 		for (OCRDatum *datum in self.datums)
 		{
-			for (VNRecognizedTextObservation *piece in datum.textPieces)
+			if (datum.image != nil)
 			{
-				NSArray<VNRecognizedText *> *text1 = [piece topCandidates:1];
-				[a addObject:text1.firstObject.string];
+				for (VNRecognizedTextObservation *piece in datum.textPieces)
+				{
+					NSArray<VNRecognizedText *> *text1 = [piece topCandidates:1];
+					[a addObject:text1.firstObject.string];
+				}
 			}
 		}
 		return [a componentsJoinedByString:@"\n"];
@@ -216,15 +228,18 @@ static NSSpeechSynthesizer *sSpeechSynthesizer;
 	{
 		for (OCRDatum *datum in self.datums)
 		{
-			for (VNRecognizedTextObservation *piece in datum.textPieces)
+			if (datum.image != nil)
 			{
-				NSValue *rangeInAValue = datum.selectionPieces[piece];
-				if (rangeInAValue != nil)
+				for (VNRecognizedTextObservation *piece in datum.textPieces)
 				{
-					NSArray<VNRecognizedText *> *text1 = [piece topCandidates:1];
-					NSString *s = text1.firstObject.string;
-					s = [s substringWithRange:[rangeInAValue rangeValue]];
-					[a addObject:s];
+					NSValue *rangeInAValue = datum.selectionPieces[piece];
+					if (rangeInAValue != nil)
+					{
+						NSArray<VNRecognizedText *> *text1 = [piece topCandidates:1];
+						NSString *s = text1.firstObject.string;
+						s = [s substringWithRange:[rangeInAValue rangeValue]];
+						[a addObject:s];
+					}
 				}
 			}
 		}
@@ -248,14 +263,17 @@ static NSSpeechSynthesizer *sSpeechSynthesizer;
 	{
 		for (OCRDatum *datum in self.datums)
 		{
-			if (datum.textPieces)
+			if (datum.image != nil && datum.textPieces)
 			{
 				CGRect container = [[[self view] enclosingScrollView] documentVisibleRect];
+				CGSize imageSize = datum.selectionLayer.bounds.size;
 				for (VNRecognizedTextObservation *piece in datum.textPieces)
 				{
-					CGRect r = [self boundBoxOfPiece:piece];
+					CGRect r = VNImageRectForNormalizedRect(piece.boundingBox, imageSize.width, imageSize.height);
+					r = [datum.selectionLayer convertRect:r toLayer:self.view.layer];
 					r = CGRectIntersection(r, container);
-					if (!CGRectIsEmpty(r) && CGRectContainsPoint(r, where)) {
+					if (!CGRectIsEmpty(r) && CGRectContainsPoint(r, where))
+					{
 						return piece;
 					}
 				}
@@ -265,25 +283,11 @@ static NSSpeechSynthesizer *sSpeechSynthesizer;
 	return nil;
 }
 
-/// Return the boundbox of a piece in View coordinates
-///
-/// @param piece - A text piece
-/// @return The bound box in View coordinates
-- (CGRect)boundBoxOfPiece:(VNRecognizedTextObservation *)piece API_AVAILABLE(macos(10.15))
-{
-	NSAffineTransform *transform = [NSAffineTransform transform];
-	[transform scaleXBy:self.view.bounds.size.width yBy:self.view.bounds.size.height];
-	CGRect r = piece.boundingBox;
-	r.origin = [transform transformPoint:r.origin];
-	r.size = [transform transformSize:r.size];
-	return r;
-}
-
 /// Return the boundbox of a range of a piece in View coordinates
 ///
 /// @param piece - A text piece
 /// @param charRange - the range within the piece.
-/// @return The bound box in View coordinates
+/// @return The bound box in VNRecognizedTextObservation coordinates
 - (CGRect)boundBoxOfPiece:(VNRecognizedTextObservation *)piece range:(NSRange)charRange API_AVAILABLE(macos(10.15))
 {
 	VNRecognizedText *text1 = [[piece topCandidates:1] firstObject];
@@ -293,13 +297,8 @@ static NSSpeechSynthesizer *sSpeechSynthesizer;
 		return CGRectNull;
 	}
 
-	NSAffineTransform *transform = [NSAffineTransform transform];
-	[transform scaleXBy:self.view.bounds.size.width yBy:self.view.bounds.size.height];
 	NSBezierPath *path = OCRBezierPathFromTextObservationRange(piece, charRange);
-	CGRect r = path.bounds;
-	r.origin = [transform transformPoint:r.origin];
-	r.size = [transform transformSize:r.size];
-	return r;
+	return path.bounds;
 }
 
 
@@ -374,7 +373,7 @@ static NSSpeechSynthesizer *sSpeechSynthesizer;
 	BOOL isDoingMouseDown = (textPiece != nil);
 	if (isDoingMouseDown)
 	{
-		[self mouseDownText:theEvent textPiece:textPiece];
+		[self mouseDown:theEvent textPiece:textPiece];
 	}
 	else if (!(theEvent.modifierFlags & NSEventModifierFlagCommand) && self.isAnySelected)
 	{
@@ -388,14 +387,14 @@ static NSSpeechSynthesizer *sSpeechSynthesizer;
 	return isDoingMouseDown;
 }
 
-- (void)mouseDownText:(NSEvent *)theEvent textPiece:(NSObject *)textPiece
+- (void)mouseDown:(NSEvent *)theEvent textPiece:(NSObject *)textPiece
 {
 	NSInteger i = 0;
 	NSValue *rangeValue = nil;
 	for (;i < self.datums.count; ++i) {
 		OCRDatum *datum = self.datums[i];
 		rangeValue = datum.selectionPieces[textPiece];
-		if (rangeValue != nil)
+		if (datum.image != nil && rangeValue != nil)
 		{
 			break;
 		}
@@ -429,12 +428,12 @@ static NSSpeechSynthesizer *sSpeechSynthesizer;
 	BOOL isDoingMouseDragged = (textPiece != nil);
 	if (isDoingMouseDragged)
 	{
-		[self mouseDragText:theEvent textPiece:textPiece];
+		[self mouseDrag:theEvent textPiece:textPiece];
 	}
 	return isDoingMouseDragged;
 }
 
-- (void)mouseDragText:(NSEvent *)theEvent textPiece:(NSObject *)textPiece
+- (void)mouseDrag:(NSEvent *)theEvent textPiece:(NSObject *)textPiece
 {
 	NSPoint startPoint = [self.view convertPoint:[theEvent locationInWindow] fromView:nil];
 	self.isDragging = YES;
@@ -443,7 +442,10 @@ static NSSpeechSynthesizer *sSpeechSynthesizer;
 	{
 		for (OCRDatum *datum in self.datums)
 		{
-			[previousSelection addEntriesFromDictionary:datum.selectionPieces];
+			if (datum.image != nil)
+			{
+				[previousSelection addEntriesFromDictionary:datum.selectionPieces];
+			}
 		}
 	}
 	for (OCRDatum *datum in self.datums)
@@ -467,7 +469,7 @@ static NSSpeechSynthesizer *sSpeechSynthesizer;
 	self.isDragging = NO;
 }
 
-/// @param downRect - the rectangle in image coordinates from the start mouse position to the current mouse position.
+/// @param downRect - the rectangle in view coordinates from the start mouse position to the current mouse position.
 /// @param previousSelection - the selection as it was before the call to this. This method will update it.
 - (void)updateSelectionFromDownRect:(NSRect)downRect previousSelection:(NSMutableDictionary *)previousSelection
 {
@@ -476,23 +478,35 @@ static NSSpeechSynthesizer *sSpeechSynthesizer;
 		BOOL needsDisplay = NO;
 
 		for (OCRDatum *datum in self.datums) {
-			NSMutableDictionary *selectionDict = [NSMutableDictionary dictionary];
-			for (VNRecognizedTextObservation *piece in datum.textPieces)
+			if (datum.image != nil)
 			{
-				CGRect pieceR = [self boundBoxOfPiece:piece];
-				if (CGRectIntersectsRect(downRect, pieceR)) {
-					NSRange r = [self rangeOfPiece:piece intersectsRect:downRect];
-					selectionDict[piece] = [NSValue valueWithRange:r];
-					previousSelection[piece] = nil;
+				NSMutableDictionary *selectionDict = [NSMutableDictionary dictionary];
+				CGSize imageSize = datum.selectionLayer.bounds.size;
+				for (VNRecognizedTextObservation *piece in datum.textPieces)
+				{
+					CGRect pieceR = VNImageRectForNormalizedRect(piece.boundingBox, imageSize.width, imageSize.height);
+					pieceR = [datum.selectionLayer convertRect:pieceR toLayer:self.view.layer];
+					if (CGRectIntersectsRect(downRect, pieceR)) {
+						CGRect imageDownRect = [datum.selectionLayer convertRect:downRect fromLayer:self.view.layer];
+						CGRect pieceDownRect = VNNormalizedRectForImageRect(imageDownRect, imageSize.width, imageSize.height);
+						NSRange r = [self rangeOfPiece:piece intersectsRect:pieceDownRect];
+						NSValue *rangePtr = previousSelection[piece];
+						if (rangePtr != nil) {
+							NSRange oldRange = [rangePtr rangeValue];
+							r = UnionRanges(r, oldRange);
+							previousSelection[piece] = nil;
+						}
+						selectionDict[piece] = [NSValue valueWithRange:r];
+					}
 				}
-			}
-			[selectionDict addEntriesFromDictionary:previousSelection];
-			if (![datum.selectionPieces isEqual:selectionDict]) {
-				datum.selectionPieces = selectionDict;
-				needsDisplay = YES;
+				[selectionDict addEntriesFromDictionary:previousSelection];
+				if (![datum.selectionPieces isEqual:selectionDict]) {
+					datum.selectionPieces = selectionDict;
+					needsDisplay = YES;
+				}
+
 			}
 		}
-
 		if (needsDisplay)
 		{
 			[self.view setNeedsDisplay:YES];
@@ -504,7 +518,7 @@ static NSSpeechSynthesizer *sSpeechSynthesizer;
 // if the start and end indices delimit a range that intersects r, return the range, else the NotFound range.
 //
 // @param piece - the VNRecognizedTextObservation to examine
-// @param r - The rectangle to intersect against
+// @param r - The rectangle, in VNRecognizedTextObservation coordinates to intersect against
 // @param start - the start index into the string of the text of the piece
 // @param end - the end index into the string of the text of the piece
 // @return the range of the word of the piece that downRect intersects, else the NotFound range.
@@ -522,6 +536,7 @@ static NSSpeechSynthesizer *sSpeechSynthesizer;
 	return NSMakeRange(NSNotFound, 0);
 }
 
+/// @param downRect - in VNRecognizedTextObservation coordinates
 // @return the first range of the word of the piece that downRect intersects, else the NotFound range.
 - (NSRange)firstRangeOfPiece:(VNRecognizedTextObservation *)piece intersectsRect:(NSRect)downRect indexSet:(NSIndexSet *)wordStarts  API_AVAILABLE(macos(10.15))
 {
@@ -539,6 +554,7 @@ static NSSpeechSynthesizer *sSpeechSynthesizer;
 	return NSMakeRange(NSNotFound, 0);
 }
 
+/// @param downRect - in VNRecognizedTextObservation coordinates
 /// @return the last range of the word of the piece that downRect intersects, else the NotFound range.
 - (NSRange)lastRangeOfPiece:(VNRecognizedTextObservation *)piece intersectsRect:(NSRect)downRect indexSet:(NSIndexSet *)wordStarts  API_AVAILABLE(macos(10.15))
 {
@@ -556,6 +572,7 @@ static NSSpeechSynthesizer *sSpeechSynthesizer;
 	return NSMakeRange(0, NSNotFound);
 }
 
+/// @param downRect - in VNRecognizedTextObservation coordinates
 /// @return the range of all of the words of the text of the piece that downRect intersects.
 - (NSRange)rangeOfPiece:(VNRecognizedTextObservation *)piece intersectsRect:(NSRect)downRect API_AVAILABLE(macos(10.15))
 {
@@ -582,14 +599,17 @@ static NSSpeechSynthesizer *sSpeechSynthesizer;
 	{
 		for (OCRDatum *datum in self.datums)
 		{
-			if (datum.textPieces)
+			if (datum.image != nil && datum.textPieces.count)
 			{
 				CGRect container = [[[self view] enclosingScrollView] documentVisibleRect];
+				CGSize imageSize = datum.selectionLayer.bounds.size;
 				for (VNRecognizedTextObservation *piece in datum.textPieces)
 				{
-					CGRect r = [self boundBoxOfPiece:piece];
+					CGRect r = VNImageRectForNormalizedRect(piece.boundingBox, imageSize.width, imageSize.height);
+					r = [datum.selectionLayer convertRect:r toLayer:self.view.layer];
 					r = CGRectIntersection(r, container);
-					if (!CGRectIsEmpty(r)) {
+					if (!CGRectIsEmpty(r))
+					{
 						[self.view addCursorRect:r cursor:[NSCursor IBeamCursor]];
 					}
 				}
@@ -657,12 +677,15 @@ static NSSpeechSynthesizer *sSpeechSynthesizer;
 	{
 		for (OCRDatum *datum in self.datums)
 		{
-			datum.selectionPieces = [NSMutableDictionary dictionary];
-			for (VNRecognizedTextObservation *piece in datum.textPieces)
+			if (datum.image != nil)
 			{
-				NSArray<VNRecognizedText *> *text1 = [piece topCandidates:1];
-				NSRange r = NSMakeRange(0, text1.firstObject.string.length);
-				datum.selectionPieces[piece] = [NSValue valueWithRange:r];
+				datum.selectionPieces = [NSMutableDictionary dictionary];
+				for (VNRecognizedTextObservation *piece in datum.textPieces)
+				{
+					NSArray<VNRecognizedText *> *text1 = [piece topCandidates:1];
+					NSRange r = NSMakeRange(0, text1.firstObject.string.length);
+					datum.selectionPieces[piece] = [NSValue valueWithRange:r];
+				}
 			}
 		}
 		[self.view setNeedsDisplay:YES];
